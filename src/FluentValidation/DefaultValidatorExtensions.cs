@@ -42,9 +42,18 @@ namespace FluentValidation {
 		/// <returns></returns>
 		public static IRuleBuilderOptions<T, TProperty> SetValidator<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, CustomValidator<T, TProperty> validator) {
 			if (validator == null) throw new ArgumentNullException(nameof(validator));
-			var rb = (RuleBuilder<T, TProperty>) ruleBuilder;
-			rb.Rule.AddValidator(validator);
-			return rb;
+
+			if (ruleBuilder is IExecutableValidationRule<T> r) {
+				// Starting a new chain.
+				validator.ParentRule = r;
+				((IValidationRule<T, TProperty>) r).AddValidator(validator);
+			}
+			else if (ruleBuilder is CustomValidator<T, TProperty> cv) {
+				// Adding validator to existing chain.
+				validator.ParentRule = cv.ParentRule;
+				((IValidationRule<T, TProperty>) validator.ParentRule).AddValidator(validator);
+			}
+			return validator;
 		}
 
 		/// <summary>

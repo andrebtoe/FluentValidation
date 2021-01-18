@@ -46,6 +46,8 @@ namespace FluentValidation {
 		Task ValidateAsync(ValidationContext<T> context, CancellationToken cancellation);
 
 		void AddDependentRules(IEnumerable<IExecutableValidationRule<T>> rules);
+
+		AbstractValidator<T> ParentValidator { get; }
 	}
 
 	public interface IValidationRule<T, TProperty> : IValidationRule<T> {

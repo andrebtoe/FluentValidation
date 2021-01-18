@@ -18,6 +18,7 @@
 
 namespace FluentValidation.Validators {
 	using System;
+	using System.Collections.Generic;
 	using System.Threading;
 	using System.Threading.Tasks;
 	using Internal;
@@ -51,7 +52,7 @@ namespace FluentValidation.Validators {
 	}
 
 
-	public class CustomValidator<T, TProperty> : IPropertyValidator {
+	public class CustomValidator<T, TProperty> : IPropertyValidator, IRuleBuilderOptions<T,TProperty> {
 		private string _errorMessage;
 		private Func<PropertyValidatorContext<T,TProperty>, string> _errorMessageFactory;
 		private Func<IValidationContext, bool> _condition;
@@ -250,5 +251,40 @@ namespace FluentValidation.Validators {
 		}
 
 		internal Action<T, PropertyValidatorContext<T,TProperty>, string> OnFailure { get; set; }
+
+		internal IExecutableValidationRule<T> ParentRule { get; set; }
+
+		IRuleBuilderOptions<T, TProperty> IRuleBuilderOptions<T, TProperty>.DependentRules(Action action) {
+			var dependencyContainer = new List<IExecutableValidationRule<T>>();
+
+			// Capture any rules added to the parent validator inside this delegate.
+			using (ParentRule.ParentValidator.Rules.Capture(dependencyContainer.Add)) {
+				action();
+			}
+
+			if (ParentRule.RuleSets != null && ParentRule.RuleSets.Length > 0) {
+				foreach (var dependentRule in dependencyContainer) {
+					if (dependentRule is PropertyRule<T, TProperty> propRule && propRule.RuleSets == null) {
+						propRule.RuleSets = ParentRule.RuleSets;
+					}
+				}
+			}
+
+			ParentRule.AddDependentRules(dependencyContainer);
+			return this;
+
+		}
+
+		IRuleBuilderOptions<T, TProperty> IRuleBuilder<T, TProperty>.SetValidator(IValidator<TProperty> validator, params string[] ruleSets) {
+			return ((IRuleBuilder<T, TProperty>) ParentRule).SetValidator(validator, ruleSets);
+		}
+
+		IRuleBuilderOptions<T, TProperty> IRuleBuilder<T, TProperty>.SetValidator<TValidator>(Func<T, TValidator> validatorProvider, params string[] ruleSets) {
+			return ((IRuleBuilder<T, TProperty>) ParentRule).SetValidator(validatorProvider, ruleSets);
+		}
+
+		IRuleBuilderOptions<T, TProperty> IRuleBuilder<T, TProperty>.SetValidator<TValidator>(Func<T, TProperty, TValidator> validatorProvider, params string[] ruleSets) {
+			return ((IRuleBuilder<T, TProperty>) ParentRule).SetValidator(validatorProvider, ruleSets);
+		}
 	}
 }

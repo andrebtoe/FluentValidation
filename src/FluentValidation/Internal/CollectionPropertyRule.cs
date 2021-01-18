@@ -34,7 +34,7 @@ namespace FluentValidation.Internal {
 	/// </summary>
 	/// <typeparam name="TElement"></typeparam>
 	/// <typeparam name="T"></typeparam>
-	internal class CollectionPropertyRule<T, TElement> : RuleBase<T, IEnumerable<TElement>, TElement>, ICollectionRule<T, TElement>, IExecutableValidationRule<T> {
+	internal class CollectionPropertyRule<T, TElement> : RuleBase<T, IEnumerable<TElement>, TElement>, ICollectionRule<T, TElement>, IExecutableValidationRule<T>, IRuleBuilderInitialCollection<T,TElement> {
 		/// <summary>
 		/// Initializes new instance of the CollectionPropertyRule class
 		/// </summary>
@@ -58,32 +58,38 @@ namespace FluentValidation.Internal {
 		/// </summary>
 		public Func<T, IEnumerable<TElement>, TElement, int, string> IndexBuilder { get; set; }
 
+		AbstractValidator<T> IExecutableValidationRule<T>.ParentValidator => ParentValidator;
+
 		/// <summary>
 		/// Creates a new property rule from a lambda expression.
 		/// </summary>
-		public static CollectionPropertyRule<T, TElement> Create(Expression<Func<T, IEnumerable<TElement>>> expression, Func<CascadeMode> cascadeModeThunk, bool bypassCache = false) {
+		public static CollectionPropertyRule<T, TElement> Create(Expression<Func<T, IEnumerable<TElement>>> expression, Func<CascadeMode> cascadeModeThunk, AbstractValidator<T> parent, bool bypassCache = false) {
 			var member = expression.GetMember();
 			var compiled = AccessorCache<T>.GetCachedAccessor(member, expression, bypassCache, "FV_RuleForEach");
-			return new CollectionPropertyRule<T, TElement>(member, x => compiled(x), expression, cascadeModeThunk, typeof(TElement));
+			return new CollectionPropertyRule<T, TElement>(member, x => compiled(x), expression, cascadeModeThunk, typeof(TElement)) {
+				ParentValidator = parent
+			};
 		}
 
 		/// <summary>
 		/// Creates a new property rule from a lambda expression.
 		/// </summary>
-		internal static CollectionPropertyRule<T, TElement> CreateTransformed<TOriginal>(Expression<Func<T, IEnumerable<TOriginal>>> expression, Func<TOriginal, TElement> transformer, Func<CascadeMode> cascadeModeThunk, bool bypassCache = false) {
+		internal static CollectionPropertyRule<T, TElement> CreateTransformed<TOriginal>(Expression<Func<T, IEnumerable<TOriginal>>> expression, Func<TOriginal, TElement> transformer, Func<CascadeMode> cascadeModeThunk, AbstractValidator<T> parent, bool bypassCache = false) {
 			var member = expression.GetMember();
 			var compiled = AccessorCache<T>.GetCachedAccessor(member, expression, bypassCache, "FV_RuleForEach");
 
 			IEnumerable<TElement> PropertyFunc(T instance) =>
 				compiled(instance).Select(transformer);
 
-			return new CollectionPropertyRule<T, TElement>(member, PropertyFunc, expression, cascadeModeThunk, typeof(TElement));
+			return new CollectionPropertyRule<T, TElement>(member, PropertyFunc, expression, cascadeModeThunk, typeof(TElement)) {
+				ParentValidator = parent,
+			};
 		}
 
 		/// <summary>
 		/// Creates a new property rule from a lambda expression.
 		/// </summary>
-		internal static CollectionPropertyRule<T, TElement> CreateTransformed<TOriginal>(Expression<Func<T, IEnumerable<TOriginal>>> expression, Func<T, TOriginal, TElement> transformer, Func<CascadeMode> cascadeModeThunk, bool bypassCache = false) {
+		internal static CollectionPropertyRule<T, TElement> CreateTransformed<TOriginal>(Expression<Func<T, IEnumerable<TOriginal>>> expression, Func<T, TOriginal, TElement> transformer, Func<CascadeMode> cascadeModeThunk, AbstractValidator<T> parent, bool bypassCache = false) {
 			var member = expression.GetMember();
 			var compiled = AccessorCache<T>.GetCachedAccessor(member, expression, bypassCache, "FV_RuleForEach");
 
@@ -91,7 +97,9 @@ namespace FluentValidation.Internal {
 				return compiled(instance).Select(element => transformer(instance, element));
 			}
 
-			return new CollectionPropertyRule<T, TElement>(member, PropertyFunc, expression, cascadeModeThunk, typeof(TOriginal));
+			return new CollectionPropertyRule<T, TElement>(member, PropertyFunc, expression, cascadeModeThunk, typeof(TOriginal)) {
+				ParentValidator = parent,
+			};
 		}
 
 		void IExecutableValidationRule<T>.Validate(ValidationContext<T> context) {
