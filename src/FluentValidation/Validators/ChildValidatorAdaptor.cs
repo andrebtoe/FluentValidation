@@ -17,7 +17,7 @@ namespace FluentValidation.Validators {
 		Type ValidatorType { get; }
 	}
 
-	public class ChildValidatorAdaptor<T,TProperty> : NoopPropertyValidator<T,TProperty>, IChildValidatorAdaptor {
+	public class ChildValidatorAdaptor<T,TProperty> : CustomValidator<T,TProperty>, IChildValidatorAdaptor {
 		private readonly Func<PropertyValidatorContext<T, TProperty>, IValidator<TProperty>> _validatorProvider;
 		private readonly IValidator<TProperty> _validator;
 
@@ -32,14 +32,18 @@ namespace FluentValidation.Validators {
 		public ChildValidatorAdaptor(IValidator<TProperty> validator, Type validatorType) {
 			_validator = validator;
 			ValidatorType = validatorType;
+			ValidationAction = Validate;
+			AsyncValidationAction = ValidateAsync;
 		}
 
 		public ChildValidatorAdaptor(Func<PropertyValidatorContext<T, TProperty>, IValidator<TProperty>> validatorProvider, Type validatorType) {
 			_validatorProvider = validatorProvider;
 			ValidatorType = validatorType;
+			ValidationAction = Validate;
+			AsyncValidationAction = ValidateAsync;
 		}
 
-		public override void Validate(PropertyValidatorContext<T,TProperty> context) {
+		public new void Validate(PropertyValidatorContext<T,TProperty> context) {
 			if (context.PropertyValue == null) {
 				return;
 			}
@@ -70,7 +74,7 @@ namespace FluentValidation.Validators {
 			}
 		}
 
-		public override async Task ValidateAsync(PropertyValidatorContext<T,TProperty> context, CancellationToken cancellation) {
+		public new async Task ValidateAsync(PropertyValidatorContext<T,TProperty> context, CancellationToken cancellation) {
 			if (context.PropertyValue == null) {
 				return;
 			}

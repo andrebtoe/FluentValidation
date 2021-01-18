@@ -17,6 +17,7 @@ namespace FluentValidation.Tests {
 				PropertyName = "Surname"
 			};
 			var context = new PropertyValidatorContext<Person,string>(parentContext, rule, null, (string)null);
+			context.Initialize(validator);
 			validator.Validate(context);
 			parentContext.Failures.Single().ShouldNotBeNull();
 		}

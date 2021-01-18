@@ -125,7 +125,7 @@ namespace FluentValidation.Internal {
 
 			// Invoke each validator and collect its results.
 			foreach (var validator in _validators) {
-				context.Formatter.Reset();
+				propertyContext.Initialize(validator);
 
 				if (validator.ShouldValidateAsynchronously(context)) {
 					InvokePropertyValidatorAsync(propertyContext, validator, default).GetAwaiter().GetResult();
@@ -201,9 +201,8 @@ namespace FluentValidation.Internal {
 
 			// Invoke each validator and collect its results.
 			foreach (var validator in _validators) {
-				context.Formatter.Reset();
-
 				cancellation.ThrowIfCancellationRequested();
+				propertyContext.Initialize(validator);
 
 				if (validator.ShouldValidateAsynchronously(context)) {
 					await InvokePropertyValidatorAsync(propertyContext, validator, cancellation);
@@ -233,13 +232,13 @@ namespace FluentValidation.Internal {
 			}
 		}
 
-		private async Task InvokePropertyValidatorAsync(PropertyValidatorContext<T,TProperty> context, PropertyValidator<T,TProperty> validator, CancellationToken cancellation) {
+		private async Task InvokePropertyValidatorAsync(PropertyValidatorContext<T,TProperty> context, CustomValidator<T, TProperty> validator, CancellationToken cancellation) {
 			if (!validator.InvokeCondition(context.ParentContext)) return;
 			if (!await validator.InvokeAsyncCondition(context.ParentContext, cancellation)) return;
 			await validator.ValidateAsync(context, cancellation);
 		}
 
-		private protected void InvokePropertyValidator(PropertyValidatorContext<T,TProperty> context, PropertyValidator<T,TProperty> validator) {
+		private protected void InvokePropertyValidator(PropertyValidatorContext<T,TProperty> context, CustomValidator<T,TProperty> validator) {
 			if (!validator.InvokeCondition(context.ParentContext)) return;
 			validator.Validate(context);
 		}

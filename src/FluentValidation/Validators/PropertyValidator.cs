@@ -18,18 +18,70 @@
 
 namespace FluentValidation.Validators {
 	using System;
-	using System.Collections.Generic;
-	using System.Linq;
 	using System.Threading;
 	using System.Threading.Tasks;
 	using Internal;
-	using Resources;
-	using Results;
 
-	public abstract class PropertyValidator<T, TProperty> : PropertyValidatorOptions<T,TProperty>, IPropertyValidator {
 
-		/// <inheritdoc />
-		public abstract string Name { get; }
+	public abstract class PropertyValidator<T, TProperty> : CustomValidator<T, TProperty> {
+
+		public PropertyValidator() {
+			ValidationAction = context => {
+				if (!IsValid(context)) {
+					context.AddFailure();
+				}
+			};
+		}
+
+		protected abstract bool IsValid(PropertyValidatorContext<T, TProperty> context);
+	}
+
+
+	public abstract class AsyncPropertyValidator<T, TProperty> : CustomValidator<T, TProperty> {
+
+		public AsyncPropertyValidator() {
+			AsyncValidationAction = async (context, cancel) => {
+				if (!await IsValidAsync(context, cancel)) {
+					context.AddFailure();
+				}
+			};
+		}
+
+		protected abstract Task<bool> IsValidAsync(PropertyValidatorContext<T, TProperty> context, CancellationToken cancellation);
+	}
+
+
+	public class CustomValidator<T, TProperty> : IPropertyValidator {
+		private string _errorMessage;
+		private Func<PropertyValidatorContext<T,TProperty>, string> _errorMessageFactory;
+		private Func<IValidationContext, bool> _condition;
+		private Func<IValidationContext, CancellationToken, Task<bool>> _asyncCondition;
+		private string _errorCode;
+
+		internal Action<PropertyValidatorContext<T,TProperty>> ValidationAction { get; init; }
+		internal Func<PropertyValidatorContext<T,TProperty>, CancellationToken, Task> AsyncValidationAction { get; init; }
+
+		/// <summary>
+		/// Whether or not this validator has a condition associated with it.
+		/// </summary>
+		public bool HasCondition => _condition != null;
+
+		/// <summary>
+		/// Whether or not this validator has an async condition associated with it.
+		/// </summary>
+		public bool HasAsyncCondition => _asyncCondition != null;
+
+		public virtual string Name => "CustomValidator";
+
+		///// <inheritdoc />
+		// public string Name {
+		// 	get {
+		// 		if (_originalErrorCode == null) {
+		// 			_originalErrorCode = ValidatorOptions.Global.ErrorCodeResolver(this);
+		// 		}
+		// 		return _originalErrorCode;
+		// 	}
+		// }
 
 		/// <summary>
 		/// Retrieves a localized string from the LanguageManager.
@@ -58,13 +110,8 @@ namespace FluentValidation.Validators {
 		/// Performs validation
 		/// </summary>
 		/// <param name="context"></param>
-		public virtual void Validate(PropertyValidatorContext<T,TProperty> context) {
-			if (IsValid(context)) return;
-
-			PrepareMessageFormatterForValidationError(context);
-			var failure = CreateValidationError(context);
-			OnFailure?.Invoke(context.InstanceToValidate, context, failure.ErrorMessage);
-			context.AddFailure(failure);
+		public void Validate(PropertyValidatorContext<T,TProperty> context) {
+			ValidationAction(context);
 		}
 
 		/// <summary>
@@ -72,77 +119,136 @@ namespace FluentValidation.Validators {
 		/// </summary>
 		/// <param name="context"></param>
 		/// <param name="cancellation"></param>
-		public virtual async Task ValidateAsync(PropertyValidatorContext<T,TProperty> context, CancellationToken cancellation) {
-			if (await IsValidAsync(context, cancellation)) return;
-
-			PrepareMessageFormatterForValidationError(context);
-			var failure = CreateValidationError(context);
-			OnFailure?.Invoke(context.InstanceToValidate, context, failure.ErrorMessage);
-			context.AddFailure(failure);
+		public Task ValidateAsync(PropertyValidatorContext<T,TProperty> context, CancellationToken cancellation) {
+			if (AsyncValidationAction != null) {
+				return AsyncValidationAction(context, cancellation);
+			}
+			else {
+				ValidationAction(context);
+				return Task.CompletedTask;
+			}
 		}
 
 		/// <inheritdoc />
 		public virtual bool ShouldValidateAsynchronously(IValidationContext context) {
 			// If the user has applied an async condition, then always go through the async path
 			// even if validator is being run synchronously.
-			if (HasAsyncCondition) return true;
+			if (HasAsyncCondition || AsyncValidationAction != null) return true;
 			return false;
 		}
 
-		protected abstract bool IsValid(PropertyValidatorContext<T,TProperty> context);
-
-#pragma warning disable 1998
-		protected virtual async Task<bool> IsValidAsync(PropertyValidatorContext<T, TProperty> context, CancellationToken cancellation) {
-			return IsValid(context);
-		}
-#pragma warning restore 1998
-
 		/// <summary>
-		/// Prepares the <see cref="MessageFormatter"/> of <paramref name="context"/> for an upcoming <see cref="ValidationFailure"/>.
+		/// Adds a condition for this validator. If there's already a condition, they're combined together with an AND.
 		/// </summary>
-		/// <param name="context">The validator context</param>
-		protected virtual void PrepareMessageFormatterForValidationError(PropertyValidatorContext<T, TProperty> context) {
-			context.MessageFormatter.AppendPropertyName(context.DisplayName);
-			context.MessageFormatter.AppendPropertyValue(context.PropertyValue);
-
-			// If there's a collection index cached in the root context data then add it
-			// to the message formatter. This happens when a child validator is executed
-			// as part of a call to RuleForEach. Usually parameters are not flowed through to
-			// child validators, but we make an exception for collection indices.
-			if (context.ParentContext.RootContextData.TryGetValue("__FV_CollectionIndex", out var index)) {
-				// If our property validator has explicitly added a placeholder for the collection index
-				// don't overwrite it with the cached version.
-				if (!context.MessageFormatter.PlaceholderValues.ContainsKey("CollectionIndex")) {
-					context.MessageFormatter.AppendArgument("CollectionIndex", index);
-				}
+		/// <param name="condition"></param>
+		public void ApplyCondition(Func<IValidationContext, bool> condition) {
+			if (_condition == null) {
+				_condition = condition;
+			}
+			else {
+				var original = _condition;
+				_condition = ctx => condition(ctx) && original(ctx);
 			}
 		}
 
 		/// <summary>
-		/// Creates an error validation result for this validator.
+		/// Adds a condition for this validator. If there's already a condition, they're combined together with an AND.
 		/// </summary>
-		/// <param name="context">The validator context</param>
-		/// <returns>Returns an error validation result.</returns>
-		protected virtual ValidationFailure CreateValidationError(PropertyValidatorContext<T,TProperty> context) {
-			var messageBuilderContext = new MessageBuilderContext<T,TProperty>(context, this);
-
-			var error = context.Rule.MessageBuilder != null
-				? context.Rule.MessageBuilder(messageBuilderContext)
-				: messageBuilderContext.GetDefaultMessage();
-
-			var failure = new ValidationFailure(context.PropertyName, error, context.PropertyValue);
-			failure.FormattedMessagePlaceholderValues = context.MessageFormatter.PlaceholderValues;
-			failure.ErrorCode = ErrorCode ?? ValidatorOptions.Global.ErrorCodeResolver(this);
-
-			if (CustomStateProvider != null) {
-				failure.CustomState = CustomStateProvider(context);
+		/// <param name="condition"></param>
+		public void ApplyAsyncCondition(Func<IValidationContext, CancellationToken, Task<bool>> condition) {
+			if (_asyncCondition == null) {
+				_asyncCondition = condition;
 			}
-
-			if (SeverityProvider != null) {
-				failure.Severity = SeverityProvider(context);
+			else {
+				var original = _asyncCondition;
+				_asyncCondition = async (ctx, ct) => await condition(ctx, ct) && await original(ctx, ct);
 			}
-
-			return failure;
 		}
+
+		internal bool InvokeCondition(IValidationContext context) {
+			if (_condition != null) {
+				return _condition(context);
+			}
+
+			return true;
+		}
+
+		internal async Task<bool> InvokeAsyncCondition(IValidationContext context, CancellationToken token) {
+			if (_asyncCondition != null) {
+				return await _asyncCondition(context, token);
+			}
+
+			return true;
+		}
+
+		/// <summary>
+		/// Function used to retrieve custom state for the validator
+		/// </summary>
+		public Func<PropertyValidatorContext<T,TProperty>, object> CustomStateProvider { get; set; }
+
+		/// <summary>
+		/// Function used to retrieve the severity for the validator
+		/// </summary>
+		public Func<PropertyValidatorContext<T,TProperty>, Severity> SeverityProvider { get; set; }
+
+		/// <summary>
+		/// Retrieves the error code.
+		/// </summary>
+		public string ErrorCode {
+			get => _errorCode;
+			set {
+				_errorCode = value;
+			}
+		}
+
+		/// <summary>
+		/// Returns the default error message template for this validator, when not overridden.
+		/// </summary>
+		/// <returns></returns>
+		protected virtual string GetDefaultMessageTemplate() => "No default error message has been specified";
+
+		/// <summary>
+		/// Gets the error message. If a context is supplied, it will be used to format the message if it has placeholders.
+		/// If no context is supplied, the raw unformatted message will be returned, containing placeholders.
+		/// </summary>
+		/// <param name="context">The current property validator context.</param>
+		/// <returns>Either the formatted or unformatted error message.</returns>
+		public string GetErrorMessage(PropertyValidatorContext<T,TProperty> context) {
+			string rawTemplate = _errorMessageFactory?.Invoke(context) ?? _errorMessage ?? GetDefaultMessageTemplate();
+
+			if (context == null) {
+				return rawTemplate;
+			}
+
+			return context.MessageFormatter.BuildMessage(rawTemplate);
+		}
+
+		/// <summary>
+		/// Gets the raw unformatted error message. Placeholders will not have been rewritten.
+		/// </summary>
+		/// <returns></returns>
+		public string GetUnformattedErrorMessage() {
+			return _errorMessageFactory?.Invoke(null) ?? _errorMessage ?? GetDefaultMessageTemplate();
+		}
+
+		/// <summary>
+		/// Sets the overridden error message template for this validator.
+		/// </summary>
+		/// <param name="errorFactory">A function for retrieving the error message template.</param>
+		public void SetErrorMessage(Func<PropertyValidatorContext<T,TProperty>, string> errorFactory) {
+			_errorMessageFactory = errorFactory;
+			_errorMessage = null;
+		}
+
+		/// <summary>
+		/// Sets the overridden error message template for this validator.
+		/// </summary>
+		/// <param name="errorMessage">The error message to set</param>
+		public void SetErrorMessage(string errorMessage) {
+			_errorMessage = errorMessage;
+			_errorMessageFactory = null;
+		}
+
+		internal Action<T, PropertyValidatorContext<T,TProperty>, string> OnFailure { get; set; }
 	}
 }

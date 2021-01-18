@@ -72,9 +72,9 @@ namespace FluentValidation {
 		void SetDisplayName(Func<ValidationContext<T>, string> factory);
 
 		//TODO: Make generic
-		void AddValidator(PropertyValidator<T,TProperty> validator);
+		void AddValidator(CustomValidator<T,TProperty> validator);
 
-		PropertyValidator<T,TProperty> CurrentValidator { get; }
+		CustomValidator<T,TProperty> CurrentValidator { get; }
 
 		/// <summary>
 		/// Allows custom creation of an error message

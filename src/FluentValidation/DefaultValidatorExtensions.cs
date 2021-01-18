@@ -40,7 +40,7 @@ namespace FluentValidation {
 		/// <param name="ruleBuilder"></param>
 		/// <param name="validator">The validator to set</param>
 		/// <returns></returns>
-		public static IRuleBuilderOptions<T, TProperty> SetValidator<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, PropertyValidator<T, TProperty> validator) {
+		public static IRuleBuilderOptions<T, TProperty> SetValidator<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, CustomValidator<T, TProperty> validator) {
 			if (validator == null) throw new ArgumentNullException(nameof(validator));
 			var rb = (RuleBuilder<T, TProperty>) ruleBuilder;
 			rb.Rule.AddValidator(validator);
@@ -993,8 +993,25 @@ namespace FluentValidation {
 		/// <param name="ruleBuilder"></param>
 		/// <param name="action"></param>
 		/// <returns></returns>
-		public static IRuleBuilderInitial<T, TProperty> Custom<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Action<TProperty, PropertyValidatorContext<T,TProperty>> action) {
-			return (IRuleBuilderInitial<T, TProperty>) ruleBuilder.SetValidator(new CustomValidator<T,TProperty>(action));
+		public static IRuleBuilderOptions<T, TProperty> Custom<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Action<PropertyValidatorContext<T,TProperty>> action) {
+			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty> {
+				ValidationAction = action
+			}).WithErrorCode("CustomValidator");
+		}
+
+
+		/// <summary>
+		/// Defines a custom validation rule
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <typeparam name="TProperty"></typeparam>
+		/// <param name="ruleBuilder"></param>
+		/// <param name="action"></param>
+		/// <returns></returns>
+		public static IRuleBuilderOptions<T, TProperty> Custom<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Action<TProperty, PropertyValidatorContext<T,TProperty>> action) {
+			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty> {
+				ValidationAction = context => action(context.PropertyValue, context)
+			}).WithErrorCode("CustomValidator");
 		}
 
 		/// <summary>
@@ -1005,8 +1022,24 @@ namespace FluentValidation {
 		/// <param name="ruleBuilder"></param>
 		/// <param name="action"></param>
 		/// <returns></returns>
-		public static IRuleBuilderInitial<T, TProperty> CustomAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<TProperty, PropertyValidatorContext<T,TProperty>, CancellationToken, Task> action) {
-			return (IRuleBuilderInitial<T, TProperty>) ruleBuilder.SetValidator(new CustomValidator<T,TProperty>(action));
+		public static IRuleBuilderOptions<T, TProperty> CustomAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<TProperty, PropertyValidatorContext<T,TProperty>, CancellationToken, Task> action) {
+			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty> {
+				AsyncValidationAction = (context, cancel) => action(context.PropertyValue, context, cancel)
+			}).WithErrorCode("CustomValidator");
+		}
+
+		/// <summary>
+		/// Defines a custom validation rule
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <typeparam name="TProperty"></typeparam>
+		/// <param name="ruleBuilder"></param>
+		/// <param name="action"></param>
+		/// <returns></returns>
+		public static IRuleBuilderOptions<T, TProperty> CustomAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<PropertyValidatorContext<T,TProperty>, CancellationToken, Task> action) {
+			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty> {
+				AsyncValidationAction = action
+			}).WithErrorCode("CustomValidator");
 		}
 
 		/// <summary>

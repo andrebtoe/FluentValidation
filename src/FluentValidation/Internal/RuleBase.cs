@@ -28,7 +28,7 @@ namespace FluentValidation.Internal {
 	using Validators;
 
 	internal abstract class RuleBase<T, TProperty, TValue> : IValidationRule<T, TValue> {
-		private protected readonly List<PropertyValidator<T,TValue>> _validators = new();
+		private protected readonly List<CustomValidator<T,TValue>> _validators = new();
 		private Func<CascadeMode> _cascadeModeThunk;
 		private string _propertyDisplayName;
 		private string _propertyName;
@@ -94,7 +94,7 @@ namespace FluentValidation.Internal {
 		/// <summary>
 		/// The current validator being configured by this rule.
 		/// </summary>
-		public PropertyValidator<T,TValue> CurrentValidator => _validators.LastOrDefault();
+		public CustomValidator<T,TValue> CurrentValidator => _validators.LastOrDefault();
 
 		/// <summary>
 		/// Type of the property being validated
@@ -143,14 +143,14 @@ namespace FluentValidation.Internal {
 		/// <summary>
 		/// Adds a validator to the rule.
 		/// </summary>
-		public void AddValidator(PropertyValidator<T,TValue> validator) {
+		public void AddValidator(CustomValidator<T,TValue> validator) {
 			_validators.Add(validator);
 		}
 
 		/// <summary>
 		/// Replaces a validator in this rule. Used to wrap validators.
 		/// </summary>
-		public void ReplaceValidator(PropertyValidator<T,TValue> original, PropertyValidator<T,TValue> newValidator) {
+		public void ReplaceValidator(CustomValidator<T,TValue> original, CustomValidator<T,TValue> newValidator) {
 			var index = _validators.IndexOf(original);
 
 			if (index > -1) {
@@ -161,7 +161,7 @@ namespace FluentValidation.Internal {
 		/// <summary>
 		/// Remove a validator in this rule.
 		/// </summary>
-		public void RemoveValidator(PropertyValidator<T,TValue> original) {
+		public void RemoveValidator(CustomValidator<T,TValue> original) {
 			_validators.Remove(original);
 		}
 

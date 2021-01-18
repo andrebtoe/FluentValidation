@@ -6,12 +6,12 @@
 	public class MessageBuilderContext<T,TProperty> {
 		private PropertyValidatorContext<T,TProperty> _innerContext;
 
-		public MessageBuilderContext(PropertyValidatorContext<T,TProperty> innerContext, PropertyValidator<T,TProperty> propertyValidator) {
+		public MessageBuilderContext(PropertyValidatorContext<T,TProperty> innerContext, CustomValidator<T,TProperty> propertyValidator) {
 			_innerContext = innerContext;
 			PropertyValidator = propertyValidator;
 		}
 
-		public PropertyValidator<T,TProperty> PropertyValidator { get; }
+		public CustomValidator<T,TProperty> PropertyValidator { get; }
 
 		public ValidationContext<T> ParentContext => _innerContext.ParentContext;
 
