@@ -126,13 +126,13 @@ namespace FluentValidation.Internal {
 
 			// Invoke each validator and collect its results.
 			foreach (var validator in _validators) {
-				propertyContext.Initialize(validator);
+				propertyContext.Initialize(validator.CustomValidator, validator.Options);
 
-				if (validator.ShouldValidateAsynchronously(context)) {
-					InvokePropertyValidatorAsync(propertyContext, validator, default).GetAwaiter().GetResult();
+				if (validator.Options.ShouldValidateAsynchronously(context)) {
+					InvokePropertyValidatorAsync(propertyContext, validator.Options, default).GetAwaiter().GetResult();
 				}
 				else {
-					InvokePropertyValidator(propertyContext, validator);
+					InvokePropertyValidator(propertyContext, validator.Options);
 				}
 
 				// If there has been at least one failure, and our CascadeMode has been set to StopOnFirst
@@ -203,13 +203,13 @@ namespace FluentValidation.Internal {
 			// Invoke each validator and collect its results.
 			foreach (var validator in _validators) {
 				cancellation.ThrowIfCancellationRequested();
-				propertyContext.Initialize(validator);
+				propertyContext.Initialize(validator.CustomValidator, validator.Options);
 
-				if (validator.ShouldValidateAsynchronously(context)) {
-					await InvokePropertyValidatorAsync(propertyContext, validator, cancellation);
+				if (validator.Options.ShouldValidateAsynchronously(context)) {
+					await InvokePropertyValidatorAsync(propertyContext, validator.Options, cancellation);
 				}
 				else {
-					InvokePropertyValidator(propertyContext, validator);
+					InvokePropertyValidator(propertyContext, validator.Options);
 				}
 
 				// If there has been at least one failure, and our CascadeMode has been set to StopOnFirst
@@ -233,13 +233,13 @@ namespace FluentValidation.Internal {
 			}
 		}
 
-		private async Task InvokePropertyValidatorAsync(PropertyValidatorContext<T,TProperty> context, CustomValidator<T, TProperty> validator, CancellationToken cancellation) {
+		private async Task InvokePropertyValidatorAsync(PropertyValidatorContext<T,TProperty> context, PropertyValidatorOptions<T, TProperty> validator, CancellationToken cancellation) {
 			if (!validator.InvokeCondition(context.ParentContext)) return;
 			if (!await validator.InvokeAsyncCondition(context.ParentContext, cancellation)) return;
 			await validator.ValidateAsync(context, cancellation);
 		}
 
-		private protected void InvokePropertyValidator(PropertyValidatorContext<T,TProperty> context, CustomValidator<T,TProperty> validator) {
+		private protected void InvokePropertyValidator(PropertyValidatorContext<T,TProperty> context, PropertyValidatorOptions<T,TProperty> validator) {
 			if (!validator.InvokeCondition(context.ParentContext)) return;
 			validator.Validate(context);
 		}

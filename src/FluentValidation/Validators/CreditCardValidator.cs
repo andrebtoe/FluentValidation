@@ -18,26 +18,22 @@
 
 namespace FluentValidation.Validators {
 	using System.Linq;
-	using Resources;
-
 
 	/// <summary>
 	/// Ensures that the property value is a valid credit card number.
 	/// </summary>
-	public class CreditCardValidator<T> : PropertyValidator<T,string>, ICreditCardValidator {
+	public class CreditCardValidator<T> : ICustomValidator<T,string>, ICreditCardValidator {
 		// This logic was taken from the CreditCardAttribute in the ASP.NET MVC3 source.
+		public void Configure(ICustomRuleBuilder<T, string> rule) => rule
+			.Custom(Validate)
+			.WithErrorCode("CreditCardValidator")
+			.WithMessageFromLanguageManager("CreditCardValidator");
 
-		public override string Name => "CreditCardValidator";
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
-		}
-
-		protected override bool IsValid(PropertyValidatorContext<T,string> context) {
+		protected void Validate(IPropertyValidatorContext<T,string> context) {
 			var value = context.PropertyValue;
 
 			if (value == null) {
-				return true;
+				return;
 			}
 
 			value = value.Replace("-", "").Replace(" ", "");
@@ -47,7 +43,8 @@ namespace FluentValidation.Validators {
 			// http://www.beachnet.com/~hstiles/cardtype.html
 			foreach (char digit in value.ToCharArray().Reverse()) {
 				if (!char.IsDigit(digit)) {
-					return false;
+					context.AddFailure();
+					return;
 				}
 
 				int digitValue = (digit - '0') * (evenDigit ? 2 : 1);
@@ -59,7 +56,10 @@ namespace FluentValidation.Validators {
 				}
 			}
 
-			return (checksum % 10) == 0;
+			bool valid = (checksum % 10) == 0;
+			if (!valid) {
+				context.AddFailure();
+			}
 		}
 	}
 

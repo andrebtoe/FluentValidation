@@ -26,9 +26,7 @@ namespace FluentValidation.Validators {
 
 
 	/// <summary>
-	/// A custom property validator.
-	/// This interface should not be implemented directly in your code as it is subject to change.
-	/// Please inherit from <see cref="PropertyValidator{T,TProperty}">PropertyValidator</see> instead.
+	/// Options/Configuration for custom property validators.
 	/// </summary>
 	public interface IPropertyValidator {
 		/// <summary>
@@ -37,12 +35,6 @@ namespace FluentValidation.Validators {
 		/// <param name="context"></param>
 		/// <returns></returns>
 		bool ShouldValidateAsynchronously(IValidationContext context);
-
-		/// <summary>
-		/// The name of the validator. This is usually the type name without any generic parameters.
-		/// This is used as the default Error Code for the validator.
-		/// </summary>
-		string Name { get; }
 
 		/// <summary>
 		/// Whether or not this validator has a condition associated with it.
@@ -59,6 +51,11 @@ namespace FluentValidation.Validators {
 		/// </summary>
 		/// <returns></returns>
 		string GetUnformattedErrorMessage();
+
+		/// <summary>
+		/// The error code associated with this validator.
+		/// </summary>
+		string ErrorCode { get; }
 	}
 
 }

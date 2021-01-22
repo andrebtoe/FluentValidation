@@ -24,23 +24,33 @@ namespace FluentValidation.Validators {
 	using FluentValidation.Internal;
 	using Resources;
 
-	public class EnumValidator<T, TProperty> : PropertyValidator<T,TProperty> {
+	public class EnumValidator<T, TProperty> : ICustomValidator<T,TProperty> {
 		private readonly Type _enumType = typeof(TProperty);
 
-		public override string Name => "EnumValidator";
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule
+			.Custom(Validate)
+			.WithErrorCode("EnumValidator")
+			.WithMessageFromLanguageManager("EnumValidator");
 
-		protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
-			if (context.PropertyValue == null) return true;
+		protected void Validate(IPropertyValidatorContext<T,TProperty> context) {
+			if (context.PropertyValue == null) return;
 
 			var underlyingEnumType = Nullable.GetUnderlyingType(_enumType) ?? _enumType;
 
-			if (!underlyingEnumType.IsEnum) return false;
+			bool valid = underlyingEnumType.IsEnum;
 
-			if (underlyingEnumType.GetCustomAttribute<FlagsAttribute>() != null) {
-				return IsFlagsEnumDefined(underlyingEnumType, context.PropertyValue);
+			if (valid) {
+				if (underlyingEnumType.GetCustomAttribute<FlagsAttribute>() != null) {
+					valid = IsFlagsEnumDefined(underlyingEnumType, context.PropertyValue);
+				}
+				else {
+					valid = Enum.IsDefined(underlyingEnumType, context.PropertyValue);
+				}
 			}
 
-			return Enum.IsDefined(underlyingEnumType, context.PropertyValue);
+			if (!valid) {
+				context.AddFailure();
+			}
 		}
 
 		private static bool IsFlagsEnumDefined(Type enumType, object value) {
@@ -109,10 +119,6 @@ namespace FluentValidation.Validators {
 			}
 
 			return false;
-		}
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
 		}
 	}
 }

@@ -178,13 +178,13 @@ namespace FluentValidation.Internal {
 					var newPropertyContext = new PropertyValidatorContext<T, TElement>(newContext, this, propertyNameToValidate, valueToValidate);
 
 					foreach (var validator in filteredValidators) {
-						newPropertyContext.Initialize(validator);
+						newPropertyContext.Initialize(validator.CustomValidator, validator.Options);
 
-						if (validator.ShouldValidateAsynchronously(context)) {
-							InvokePropertyValidatorAsync(newPropertyContext, validator, index, default).GetAwaiter().GetResult();
+						if (validator.Options.ShouldValidateAsynchronously(context)) {
+							InvokePropertyValidatorAsync(newPropertyContext, validator.Options, index, default).GetAwaiter().GetResult();
 						}
 						else {
-							InvokePropertyValidator(newPropertyContext, validator, index);
+							InvokePropertyValidator(newPropertyContext, validator.Options, index);
 						}
 
 						// If there has been at least one failure, and our CascadeMode has been set to StopOnFirst
@@ -291,13 +291,13 @@ namespace FluentValidation.Internal {
 					var newPropertyContext = new PropertyValidatorContext<T, TElement>(newContext, this, propertyNameToValidate, valueToValidate);
 
 					foreach (var validator in filteredValidators) {
-						newPropertyContext.Initialize(validator);
+						newPropertyContext.Initialize(validator.CustomValidator, validator.Options);
 
-						if (validator.ShouldValidateAsynchronously(context)) {
-							await InvokePropertyValidatorAsync(newPropertyContext, validator, index, cancellation);
+						if (validator.Options.ShouldValidateAsynchronously(context)) {
+							await InvokePropertyValidatorAsync(newPropertyContext, validator.Options, index, cancellation);
 						}
 						else {
-							InvokePropertyValidator(newPropertyContext, validator, index);
+							InvokePropertyValidator(newPropertyContext, validator.Options, index);
 						}
 
 						// If there has been at least one failure, and our CascadeMode has been set to StopOnFirst
@@ -330,7 +330,7 @@ namespace FluentValidation.Internal {
 			DependentRules.AddRange(rules);
 		}
 
-		private List<CustomValidator<T,TElement>> GetValidatorsToExecute(IValidationContext context) {
+		private List<(ICustomValidator<T,TElement> CustomValidator, PropertyValidatorOptions<T,TElement> Options)> GetValidatorsToExecute(IValidationContext context) {
 			// Loop over each validator and check if its condition allows it to run.
 			// This needs to be done prior to the main loop as within a collection rule
 			// validators' conditions still act upon the root object, not upon the collection property.
@@ -340,14 +340,14 @@ namespace FluentValidation.Internal {
 			var validators = _validators.ToList();
 			int validatorIndex = 0;
 			foreach (var validator in _validators) {
-				if (validator.HasCondition) {
-					if (!validator.InvokeCondition(context)) {
+				if (validator.Options.HasCondition) {
+					if (!validator.Options.InvokeCondition(context)) {
 						validators.RemoveAt(validatorIndex);
 					}
 				}
 
-				if (validator.HasAsyncCondition) {
-					if (!validator.InvokeAsyncCondition(context, default).GetAwaiter().GetResult()) {
+				if (validator.Options.HasAsyncCondition) {
+					if (!validator.Options.InvokeAsyncCondition(context, default).GetAwaiter().GetResult()) {
 						validators.RemoveAt(validatorIndex);
 					}
 				}
@@ -358,7 +358,7 @@ namespace FluentValidation.Internal {
 			return validators;
 		}
 
-		private async Task<List<CustomValidator<T,TElement>>> GetValidatorsToExecuteAsync(IValidationContext context, CancellationToken cancellation) {
+		private async Task<List<(ICustomValidator<T,TElement> CustomValidator, PropertyValidatorOptions<T,TElement> Options)>> GetValidatorsToExecuteAsync(IValidationContext context, CancellationToken cancellation) {
 			// Loop over each validator and check if its condition allows it to run.
 			// This needs to be done prior to the main loop as within a collection rule
 			// validators' conditions still act upon the root object, not upon the collection property.
@@ -368,14 +368,14 @@ namespace FluentValidation.Internal {
 			var validators = _validators.ToList();
 			int validatorIndex = 0;
 			foreach (var validator in _validators) {
-				if (validator.HasCondition) {
-					if (!validator.InvokeCondition(context)) {
+				if (validator.Options.HasCondition) {
+					if (!validator.Options.InvokeCondition(context)) {
 						validators.RemoveAt(validatorIndex);
 					}
 				}
 
-				if (validator.HasAsyncCondition) {
-					if (!await validator.InvokeAsyncCondition(context, cancellation)) {
+				if (validator.Options.HasAsyncCondition) {
+					if (!await validator.Options.InvokeAsyncCondition(context, cancellation)) {
 						validators.RemoveAt(validatorIndex);
 					}
 				}
@@ -386,12 +386,12 @@ namespace FluentValidation.Internal {
 			return validators;
 		}
 
-		private async Task InvokePropertyValidatorAsync(PropertyValidatorContext<T, TElement> context, CustomValidator<T, TElement> validator, int index, CancellationToken cancellation) {
+		private async Task InvokePropertyValidatorAsync(PropertyValidatorContext<T, TElement> context, PropertyValidatorOptions<T, TElement> validator, int index, CancellationToken cancellation) {
 			context.MessageFormatter.AppendArgument("CollectionIndex", index);
 			await validator.ValidateAsync(context, cancellation);
 		}
 
-		private void InvokePropertyValidator(PropertyValidatorContext<T, TElement> context, CustomValidator<T, TElement> validator, int index) {
+		private void InvokePropertyValidator(PropertyValidatorContext<T, TElement> context, PropertyValidatorOptions<T, TElement> validator, int index) {
 			context.MessageFormatter.AppendArgument("CollectionIndex", index);
 			validator.Validate(context);
 		}

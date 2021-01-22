@@ -23,12 +23,10 @@ namespace FluentValidation.Validators {
 	using System.Reflection;
 	using Resources;
 
-	public class NotEqualValidator<T,TProperty> : PropertyValidator<T,TProperty>, IComparisonValidator {
+	public class NotEqualValidator<T,TProperty> : ICustomValidator<T,TProperty>, IComparisonValidator {
 		private readonly IEqualityComparer _comparer;
 		private readonly Func<T, TProperty> _func;
 		private readonly string _memberDisplayName;
-
-		public override string Name => "NotEqualValidator";
 
 		public NotEqualValidator(Func<T, TProperty> func, MemberInfo memberToCompare, string memberDisplayName, IEqualityComparer equalityComparer = null) {
 			_func = func;
@@ -42,20 +40,23 @@ namespace FluentValidation.Validators {
 			_comparer = equalityComparer;
 		}
 
-		protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule
+			.Custom(Validate)
+			.WithErrorCode("NotEqualValidator")
+			.WithMessageFromLanguageManager("NotEqualValidator");
+
+		protected void Validate(IPropertyValidatorContext<T,TProperty> context) {
 			var comparisonValue = GetComparisonValue(context);
 			bool success = !Compare(comparisonValue, context.PropertyValue);
 
 			if (!success) {
 				context.MessageFormatter.AppendArgument("ComparisonValue", comparisonValue);
 				context.MessageFormatter.AppendArgument("ComparisonProperty", _memberDisplayName ?? "");
-				return false;
+				context.AddFailure();
 			}
-
-			return true;
 		}
 
-		private TProperty GetComparisonValue(PropertyValidatorContext<T,TProperty> context) {
+		private TProperty GetComparisonValue(IPropertyValidatorContext<T,TProperty> context) {
 			if (_func != null) {
 				return _func(context.InstanceToValidate);
 			}
@@ -76,10 +77,6 @@ namespace FluentValidation.Validators {
 			}
 
 			return Equals(comparisonValue, propertyValue);
-		}
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
 		}
 	}
 }

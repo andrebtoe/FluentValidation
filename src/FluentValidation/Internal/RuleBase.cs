@@ -28,7 +28,7 @@ namespace FluentValidation.Internal {
 	using Validators;
 
 	internal abstract class RuleBase<T, TProperty, TValue> : IValidationRule<T, TValue>, IRuleBuilderInitial<T,TValue> {
-		private protected readonly List<CustomValidator<T,TValue>> _validators = new();
+		private protected readonly List<(ICustomValidator<T,TValue> CustomValidator, PropertyValidatorOptions<T,TValue> Options)> _validators = new();
 		private Func<CascadeMode> _cascadeModeThunk;
 		private string _propertyDisplayName;
 		private string _propertyName;
@@ -96,7 +96,7 @@ namespace FluentValidation.Internal {
 		/// <summary>
 		/// The current validator being configured by this rule.
 		/// </summary>
-		public CustomValidator<T,TValue> CurrentValidator => _validators.LastOrDefault();
+		public (ICustomValidator<T,TValue> CustomValidator, PropertyValidatorOptions<T,TValue> Options) CurrentValidator => _validators.LastOrDefault();
 
 		/// <summary>
 		/// Type of the property being validated
@@ -120,7 +120,8 @@ namespace FluentValidation.Internal {
 		/// <summary>
 		/// Validators associated with this rule.
 		/// </summary>
-		public IEnumerable<IPropertyValidator> Validators => _validators.Cast<IPropertyValidator>();
+		public IEnumerable<(ICustomValidator CustomValidator, IPropertyValidator Options)> Validators
+			=> _validators.Select(x => ((ICustomValidator)x.CustomValidator, (IPropertyValidator)x.Options));
 
 		/// <summary>
 		/// Creates a new property rule.
@@ -145,26 +146,9 @@ namespace FluentValidation.Internal {
 		/// <summary>
 		/// Adds a validator to the rule.
 		/// </summary>
-		public void AddValidator(CustomValidator<T,TValue> validator) {
-			_validators.Add(validator);
-		}
-
-		/// <summary>
-		/// Replaces a validator in this rule. Used to wrap validators.
-		/// </summary>
-		public void ReplaceValidator(CustomValidator<T,TValue> original, CustomValidator<T,TValue> newValidator) {
-			var index = _validators.IndexOf(original);
-
-			if (index > -1) {
-				_validators[index] = newValidator;
-			}
-		}
-
-		/// <summary>
-		/// Remove a validator in this rule.
-		/// </summary>
-		public void RemoveValidator(CustomValidator<T,TValue> original) {
-			_validators.Remove(original);
+		public void AddValidator(ICustomValidator<T,TValue> validator, PropertyValidatorOptions<T,TValue> options) {
+			options.ParentRule = (IExecutableValidationRule<T>) this;
+			_validators.Add((validator, options));
 		}
 
 		/// <summary>
@@ -214,7 +198,7 @@ namespace FluentValidation.Internal {
 			// Default behaviour for When/Unless as of v1.3 is to apply the condition to all previous validators in the chain.
 			if (applyConditionTo == ApplyConditionTo.AllValidators) {
 				foreach (var validator in _validators) {
-					validator.ApplyCondition(predicate);
+					validator.Options.ApplyCondition(predicate);
 				}
 
 				if (DependentRules != null) {
@@ -224,7 +208,7 @@ namespace FluentValidation.Internal {
 				}
 			}
 			else {
-				CurrentValidator.ApplyCondition(predicate);
+				CurrentValidator.Options.ApplyCondition(predicate);
 			}
 		}
 
@@ -237,7 +221,7 @@ namespace FluentValidation.Internal {
 			// Default behaviour for When/Unless as of v1.3 is to apply the condition to all previous validators in the chain.
 			if (applyConditionTo == ApplyConditionTo.AllValidators) {
 				foreach (var validator in _validators) {
-					validator.ApplyAsyncCondition(predicate);
+					validator.Options.ApplyAsyncCondition(predicate);
 				}
 
 				if (DependentRules != null) {
@@ -247,7 +231,7 @@ namespace FluentValidation.Internal {
 				}
 			}
 			else {
-				CurrentValidator.ApplyAsyncCondition(predicate);
+				CurrentValidator.Options.ApplyAsyncCondition(predicate);
 			}
 		}
 
@@ -271,6 +255,14 @@ namespace FluentValidation.Internal {
 			}
 		}
 
+		public IRuleBuilderOptions<T, TValue> SetValidator(ICustomValidator<T, TValue> validator) {
+			if (validator == null) throw new ArgumentNullException(nameof(validator));
+			var options = new PropertyValidatorOptions<T, TValue>();
+			AddValidator(validator, options);
+			validator.Configure(options);
+			return options;
+		}
+
 		/// <summary>
 		/// Associates an instance of IValidator with the current property rule.
 		/// </summary>
@@ -281,8 +273,7 @@ namespace FluentValidation.Internal {
 			var adaptor = new ChildValidatorAdaptor<T,TValue>(validator, validator.GetType()) {
 				RuleSets = ruleSets
 			};
-			this.SetValidator(adaptor);
-			return adaptor;
+			return SetValidator(adaptor);
 		}
 
 		/// <summary>
@@ -295,8 +286,7 @@ namespace FluentValidation.Internal {
 			var adaptor = new ChildValidatorAdaptor<T,TValue>(context => validatorProvider(context.InstanceToValidate), typeof (TValidator)) {
 				RuleSets = ruleSets
 			};
-			this.SetValidator(adaptor);
-			return adaptor;
+			return SetValidator(adaptor);
 		}
 
 		/// <summary>
@@ -309,8 +299,7 @@ namespace FluentValidation.Internal {
 			var adaptor = new ChildValidatorAdaptor<T,TValue>(context => validatorProvider(context.InstanceToValidate, context.PropertyValue), typeof (TValidator)) {
 				RuleSets = ruleSets
 			};
-			this.SetValidator(adaptor);
-			return adaptor;
+			return SetValidator(adaptor);
 		}
 	}
 }

@@ -23,44 +23,42 @@ namespace FluentValidation.Validators {
 	using System.Threading.Tasks;
 	using Internal;
 
+	public interface ICustomValidator { }
 
-	public abstract class PropertyValidator<T, TProperty> : CustomValidator<T, TProperty> {
+	public interface ICustomValidator<T, in TProperty> : ICustomValidator {
+		void Configure(ICustomRuleBuilder<T, TProperty> rule);
+	}
 
-		public PropertyValidator() {
-			ValidationAction = context => {
-				if (!IsValid(context)) {
-					context.AddFailure();
-				}
-			};
+	internal class CustomValidator<T, TProperty> : ICustomValidator<T, TProperty> {
+		private Action<IPropertyValidatorContext<T, TProperty>> _action;
+
+		public CustomValidator(Action<IPropertyValidatorContext<T, TProperty>> action) {
+			_action = action;
 		}
 
-		protected abstract bool IsValid(PropertyValidatorContext<T, TProperty> context);
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule.Custom(_action);
+	}
+
+	internal class AsyncCustomValidator<T, TProperty> : ICustomValidator<T, TProperty> {
+		private Func<IPropertyValidatorContext<T, TProperty>, CancellationToken, Task> _action;
+
+		public AsyncCustomValidator(Func<IPropertyValidatorContext<T, TProperty>, CancellationToken, Task> action) {
+			_action = action;
+		}
+
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule.Custom(action: null, asyncAction: _action);
 	}
 
 
-	public abstract class AsyncPropertyValidator<T, TProperty> : CustomValidator<T, TProperty> {
-
-		public AsyncPropertyValidator() {
-			AsyncValidationAction = async (context, cancel) => {
-				if (!await IsValidAsync(context, cancel)) {
-					context.AddFailure();
-				}
-			};
-		}
-
-		protected abstract Task<bool> IsValidAsync(PropertyValidatorContext<T, TProperty> context, CancellationToken cancellation);
-	}
-
-
-	public class CustomValidator<T, TProperty> : IPropertyValidator, IRuleBuilderOptions<T,TProperty> {
+	public class PropertyValidatorOptions<T, TProperty> : IPropertyValidator, IRuleBuilderOptions<T,TProperty>, ICustomRuleBuilder<T,TProperty> {
 		private string _errorMessage;
-		private Func<PropertyValidatorContext<T,TProperty>, string> _errorMessageFactory;
+		private Func<IPropertyValidatorContext<T,TProperty>, string> _errorMessageFactory;
 		private Func<IValidationContext, bool> _condition;
 		private Func<IValidationContext, CancellationToken, Task<bool>> _asyncCondition;
 		private string _errorCode;
 
-		internal Action<PropertyValidatorContext<T,TProperty>> ValidationAction { get; init; }
-		internal Func<PropertyValidatorContext<T,TProperty>, CancellationToken, Task> AsyncValidationAction { get; init; }
+		private protected Action<IPropertyValidatorContext<T,TProperty>> ValidationAction { get; set; }
+		private protected Func<IPropertyValidatorContext<T,TProperty>, CancellationToken, Task> AsyncValidationAction { get; set; }
 
 		/// <summary>
 		/// Whether or not this validator has a condition associated with it.
@@ -72,46 +70,11 @@ namespace FluentValidation.Validators {
 		/// </summary>
 		public bool HasAsyncCondition => _asyncCondition != null;
 
-		public virtual string Name => "CustomValidator";
-
-		///// <inheritdoc />
-		// public string Name {
-		// 	get {
-		// 		if (_originalErrorCode == null) {
-		// 			_originalErrorCode = ValidatorOptions.Global.ErrorCodeResolver(this);
-		// 		}
-		// 		return _originalErrorCode;
-		// 	}
-		// }
-
-		/// <summary>
-		/// Retrieves a localized string from the LanguageManager.
-		/// If an ErrorCode is defined for this validator, the error code is used as the key.
-		/// If no ErrorCode is defined (or the language manager doesn't have a translation for the error code)
-		/// then the fallback key is used instead.
-		/// </summary>
-		/// <param name="fallbackKey">The fallback key to use for translation, if no ErrorCode is available.</param>
-		/// <returns>The translated error message template.</returns>
-		protected string Localized(string fallbackKey) {
-			var errorCode = ErrorCode;
-
-			if (errorCode != null) {
-				string result = ValidatorOptions.Global.LanguageManager.GetString(errorCode);
-
-				if (!string.IsNullOrEmpty(result)) {
-					return result;
-				}
-			}
-
-			return ValidatorOptions.Global.LanguageManager.GetString(fallbackKey);
-		}
-
-
 		/// <summary>
 		/// Performs validation
 		/// </summary>
 		/// <param name="context"></param>
-		public void Validate(PropertyValidatorContext<T,TProperty> context) {
+		internal void Validate(IPropertyValidatorContext<T,TProperty> context) {
 			ValidationAction(context);
 		}
 
@@ -120,7 +83,7 @@ namespace FluentValidation.Validators {
 		/// </summary>
 		/// <param name="context"></param>
 		/// <param name="cancellation"></param>
-		public Task ValidateAsync(PropertyValidatorContext<T,TProperty> context, CancellationToken cancellation) {
+		internal Task ValidateAsync(IPropertyValidatorContext<T,TProperty> context, CancellationToken cancellation) {
 			if (AsyncValidationAction != null) {
 				return AsyncValidationAction(context, cancellation);
 			}
@@ -134,7 +97,17 @@ namespace FluentValidation.Validators {
 		public virtual bool ShouldValidateAsynchronously(IValidationContext context) {
 			// If the user has applied an async condition, then always go through the async path
 			// even if validator is being run synchronously.
-			if (HasAsyncCondition || AsyncValidationAction != null) return true;
+			if (HasAsyncCondition) return true;
+
+			// If there's an async action and no sync action, always run the async version
+			if (AsyncValidationAction != null && ValidationAction == null) return true;
+
+			// If both sync & async actions have been provided, prefer the async action
+			// if ValidateAsync has been called on the root validator.
+			if (AsyncValidationAction != null && ValidationAction != null) {
+				return context.IsAsync();
+			}
+
 			return false;
 		}
 
@@ -199,6 +172,7 @@ namespace FluentValidation.Validators {
 			get => _errorCode;
 			set {
 				_errorCode = value;
+				// _defaultErrorCode ??= value;
 			}
 		}
 
@@ -214,7 +188,7 @@ namespace FluentValidation.Validators {
 		/// </summary>
 		/// <param name="context">The current property validator context.</param>
 		/// <returns>Either the formatted or unformatted error message.</returns>
-		public string GetErrorMessage(PropertyValidatorContext<T,TProperty> context) {
+		public string GetErrorMessage(IPropertyValidatorContext<T,TProperty> context) {
 			string rawTemplate = _errorMessageFactory?.Invoke(context) ?? _errorMessage ?? GetDefaultMessageTemplate();
 
 			if (context == null) {
@@ -236,7 +210,7 @@ namespace FluentValidation.Validators {
 		/// Sets the overridden error message template for this validator.
 		/// </summary>
 		/// <param name="errorFactory">A function for retrieving the error message template.</param>
-		public void SetErrorMessage(Func<PropertyValidatorContext<T,TProperty>, string> errorFactory) {
+		public void SetErrorMessage(Func<IPropertyValidatorContext<T,TProperty>, string> errorFactory) {
 			_errorMessageFactory = errorFactory;
 			_errorMessage = null;
 		}
@@ -250,7 +224,7 @@ namespace FluentValidation.Validators {
 			_errorMessageFactory = null;
 		}
 
-		internal Action<T, PropertyValidatorContext<T,TProperty>, string> OnFailure { get; set; }
+		internal Action<T, IPropertyValidatorContext<T,TProperty>, string> OnFailure { get; set; }
 
 		internal IExecutableValidationRule<T> ParentRule { get; set; }
 
@@ -275,6 +249,10 @@ namespace FluentValidation.Validators {
 
 		}
 
+		IRuleBuilderOptions<T, TProperty> IRuleBuilder<T, TProperty>.SetValidator(ICustomValidator<T, TProperty> validator) {
+			return ((IRuleBuilder<T, TProperty>) ParentRule).SetValidator(validator);
+		}
+
 		IRuleBuilderOptions<T, TProperty> IRuleBuilder<T, TProperty>.SetValidator(IValidator<TProperty> validator, params string[] ruleSets) {
 			return ((IRuleBuilder<T, TProperty>) ParentRule).SetValidator(validator, ruleSets);
 		}
@@ -285,6 +263,12 @@ namespace FluentValidation.Validators {
 
 		IRuleBuilderOptions<T, TProperty> IRuleBuilder<T, TProperty>.SetValidator<TValidator>(Func<T, TProperty, TValidator> validatorProvider, params string[] ruleSets) {
 			return ((IRuleBuilder<T, TProperty>) ParentRule).SetValidator(validatorProvider, ruleSets);
+		}
+
+		IRuleBuilderOptions<T, TProperty> ICustomRuleBuilder<T, TProperty>.Custom(Action<IPropertyValidatorContext<T, TProperty>> action, Func<IPropertyValidatorContext<T, TProperty>, CancellationToken, Task> asyncAction) {
+			ValidationAction = action;
+			AsyncValidationAction = asyncAction;
+			return this;
 		}
 	}
 }

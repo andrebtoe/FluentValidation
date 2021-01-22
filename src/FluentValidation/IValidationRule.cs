@@ -73,10 +73,9 @@ namespace FluentValidation {
 		/// <param name="factory">The function for building the display name</param>
 		void SetDisplayName(Func<ValidationContext<T>, string> factory);
 
-		//TODO: Make generic
-		void AddValidator(CustomValidator<T,TProperty> validator);
+		void AddValidator(ICustomValidator<T,TProperty> validator, PropertyValidatorOptions<T,TProperty> options);
 
-		CustomValidator<T,TProperty> CurrentValidator { get; }
+		(ICustomValidator<T,TProperty> CustomValidator, PropertyValidatorOptions<T,TProperty> Options) CurrentValidator { get; }
 
 		/// <summary>
 		/// Allows custom creation of an error message
@@ -101,7 +100,7 @@ namespace FluentValidation {
 		/// <summary>
 		/// The validators that are grouped under this rule.
 		/// </summary>
-		IEnumerable<IPropertyValidator> Validators { get; }
+		IEnumerable<(ICustomValidator CustomValidator, IPropertyValidator Options)> Validators { get; }
 		/// <summary>
 		/// Name of the rule-set to which this rule belongs.
 		/// </summary>

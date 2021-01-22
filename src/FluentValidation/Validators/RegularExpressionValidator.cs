@@ -21,10 +21,8 @@ namespace FluentValidation.Validators {
 	using System.Text.RegularExpressions;
 	using Resources;
 
-	public class RegularExpressionValidator<T> : PropertyValidator<T,string>, IRegularExpressionValidator {
+	public class RegularExpressionValidator<T> : ICustomValidator<T,string>, IRegularExpressionValidator {
 		readonly Func<T, Regex> _regexFunc;
-
-		public override string Name => "RegularExpressionValidator";
 
 		public RegularExpressionValidator(string expression) {
 			Expression = expression;
@@ -56,14 +54,18 @@ namespace FluentValidation.Validators {
 			_regexFunc = x => CreateRegex(expression(x), options);
 		}
 
-		protected override bool IsValid(PropertyValidatorContext<T,string> context) {
+		public void Configure(ICustomRuleBuilder<T, string> rule) => rule
+			.Custom(Validate)
+			.WithErrorCode("RegularExpressionValidator")
+			.WithMessageFromLanguageManager("RegularExpressionValidator");
+
+		protected void Validate(IPropertyValidatorContext<T,string> context) {
 			var regex = _regexFunc(context.InstanceToValidate);
 
-			if (regex != null && context.PropertyValue != null && !regex.IsMatch((string) context.PropertyValue)) {
+			if (regex != null && context.PropertyValue != null && !regex.IsMatch(context.PropertyValue)) {
 				context.MessageFormatter.AppendArgument("RegularExpression", regex.ToString());
-				return false;
+				context.AddFailure();
 			}
-			return true;
 		}
 
 		private static Regex CreateRegex(string expression, RegexOptions options=RegexOptions.None) {
@@ -71,13 +73,9 @@ namespace FluentValidation.Validators {
 		}
 
 		public string Expression { get; }
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
-		}
 	}
 
-	public interface IRegularExpressionValidator : IPropertyValidator {
+	public interface IRegularExpressionValidator : ICustomValidator {
 		string Expression { get; }
 	}
 }

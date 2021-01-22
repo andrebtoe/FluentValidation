@@ -52,17 +52,10 @@ namespace FluentValidation.Tests {
 		}
 
 		[Fact]
-		public void Adding_a_validator_should_return_property_validator_to_configure() {
-			var testPropertyValidator = new TestPropertyValidator<Person, string>();
-			var builderWithOptions = builder.SetValidator(testPropertyValidator);
-			builderWithOptions.ShouldBeTheSameAs(testPropertyValidator);
-		}
-
-		[Fact]
 		public void Adding_a_validator_should_store_validator() {
 			var validator = new TestPropertyValidator<Person, string>();
 			builder.SetValidator(validator);
-			_rule.CurrentValidator.ShouldBeTheSameAs(validator);
+			_rule.CurrentValidator.CustomValidator.ShouldBeTheSameAs(validator);
 		}
 
 		[Fact]
@@ -74,12 +67,12 @@ namespace FluentValidation.Tests {
 		[Fact]
 		public void Should_set_custom_error() {
 			builder.SetValidator(new TestPropertyValidator<Person, string>()).WithMessage("Bar");
-			_rule.CurrentValidator.GetErrorMessage(null).ShouldEqual("Bar");
+			_rule.CurrentValidator.Options.GetErrorMessage(null).ShouldEqual("Bar");
 		}
 
 		[Fact]
 		public void Should_throw_if_validator_is_null() {
-			typeof(ArgumentNullException).ShouldBeThrownBy(() => builder.SetValidator((PropertyValidator<Person, string>)null));
+			typeof(ArgumentNullException).ShouldBeThrownBy(() => builder.SetValidator((ICustomValidator<Person, string>)null));
 		}
 
 		[Fact]
@@ -210,21 +203,17 @@ namespace FluentValidation.Tests {
 			IValidationRule<Person, Address> rule = null;
 			builder.Configure(r => rule = r);
 
-			rule.Validators.OfType<IChildValidatorAdaptor>().Single().ValidatorType.ShouldEqual(typeof(NoopAddressValidator));
+			rule.Validators.Select(x => x.CustomValidator)
+				.OfType<IChildValidatorAdaptor>().Single().ValidatorType.ShouldEqual(typeof(NoopAddressValidator));
 		}
 
 		class NoopAddressValidator : AbstractValidator<Address> {
 		}
 
-		class TestPropertyValidator<T,TProperty> : PropertyValidator<T,TProperty> {
-			public override string Name => "TestPropertyValidator";
-
-			protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
-				return true;
-			}
-
-			protected override string GetDefaultMessageTemplate() {
-				return Localized("NotNullValidator");
+		class TestPropertyValidator<T,TProperty> : ICustomValidator<T,TProperty> {
+			public void Configure(ICustomRuleBuilder<T, TProperty> rule) {
+				rule.Custom(ctx => ctx.AddFailure())
+					.WithMessageFromLanguageManager("NotNullValidator");
 			}
 		}
 	}

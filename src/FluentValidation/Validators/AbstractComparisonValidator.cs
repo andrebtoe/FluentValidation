@@ -25,7 +25,7 @@ namespace FluentValidation.Validators {
 	/// <summary>
 	/// Base class for all comparison validators
 	/// </summary>
-	public abstract class AbstractComparisonValidator<T, TProperty> : PropertyValidator<T,TProperty>, IComparisonValidator {
+	public abstract class AbstractComparisonValidator<T, TProperty> : ICustomValidator<T,TProperty>, IComparisonValidator {
 		readonly Func<T, IComparable> _valueToCompareFunc;
 		private readonly string _comparisonMemberDisplayName;
 
@@ -48,16 +48,24 @@ namespace FluentValidation.Validators {
 			MemberToCompare = member;
 		}
 
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) {
+			rule.Custom(Validate)
+				.WithErrorCode(DefaultErrorCode)
+				.WithMessageFromLanguageManager(DefaultErrorCode);
+		}
+
+		protected abstract string DefaultErrorCode { get; }
+
 		/// <summary>
 		/// Performs the comparison
 		/// </summary>
 		/// <param name="context"></param>
 		/// <returns></returns>
-		protected sealed override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
+		protected void Validate(IPropertyValidatorContext<T,TProperty> context) {
 			if(context.PropertyValue == null) {
 				// If we're working with a nullable type then this rule should not be applied.
 				// If you want to ensure that it's never null then a NotNull rule should also be applied.
-				return true;
+				return;
 			}
 
 			var value = GetComparisonValue(context);
@@ -65,13 +73,11 @@ namespace FluentValidation.Validators {
 			if (!IsValid(context.PropertyValue as IComparable, value)) {
 				context.MessageFormatter.AppendArgument("ComparisonValue", value);
 				context.MessageFormatter.AppendArgument("ComparisonProperty", _comparisonMemberDisplayName ?? "");
-				return false;
+				context.AddFailure();
 			}
-
-			return true;
 		}
 
-		public IComparable GetComparisonValue(PropertyValidatorContext<T,TProperty> context) {
+		public IComparable GetComparisonValue(IPropertyValidatorContext<T,TProperty> context) {
 			if(_valueToCompareFunc != null) {
 				return _valueToCompareFunc(context.InstanceToValidate);
 			}
@@ -99,12 +105,13 @@ namespace FluentValidation.Validators {
 		/// Metadata- the value being compared
 		/// </summary>
 		public object ValueToCompare { get; private set; }
+
 	}
 
 	/// <summary>
 	/// Defines a comparison validator
 	/// </summary>
-	public interface IComparisonValidator : IPropertyValidator {
+	public interface IComparisonValidator : ICustomValidator {
 		/// <summary>
 		/// Metadata- the comparison type
 		/// </summary>

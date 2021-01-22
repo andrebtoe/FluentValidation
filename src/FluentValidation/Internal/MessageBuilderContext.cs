@@ -6,12 +6,15 @@
 	public class MessageBuilderContext<T,TProperty> {
 		private PropertyValidatorContext<T,TProperty> _innerContext;
 
-		public MessageBuilderContext(PropertyValidatorContext<T,TProperty> innerContext, CustomValidator<T,TProperty> propertyValidator) {
+		public MessageBuilderContext(PropertyValidatorContext<T,TProperty> innerContext, ICustomValidator<T,TProperty> validator, PropertyValidatorOptions<T,TProperty> options) {
 			_innerContext = innerContext;
-			PropertyValidator = propertyValidator;
+			Options = options;
+			PropertyValidator = validator;
 		}
 
-		public CustomValidator<T,TProperty> PropertyValidator { get; }
+		public PropertyValidatorOptions<T,TProperty> Options { get; }
+
+		public ICustomValidator<T,TProperty> PropertyValidator { get; }
 
 		public ValidationContext<T> ParentContext => _innerContext.ParentContext;
 
@@ -27,7 +30,7 @@
 		public object PropertyValue => _innerContext.PropertyValue;
 
 		public string GetDefaultMessage() {
-			return PropertyValidator.GetErrorMessage(_innerContext);
+			return Options.GetErrorMessage(_innerContext);
 		}
 		public static implicit operator PropertyValidatorContext<T,TProperty>(MessageBuilderContext<T,TProperty> ctx) {
 			return ctx._innerContext;

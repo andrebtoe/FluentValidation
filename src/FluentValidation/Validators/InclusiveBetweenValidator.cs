@@ -21,9 +21,7 @@ namespace FluentValidation.Validators {
 	using Internal;
 	using Resources;
 
-	public class InclusiveBetweenValidator<T, TProperty> : PropertyValidator<T, TProperty>, IInclusiveBetweenValidator {
-
-		public override string Name => "InclusiveBetweenValidator";
+	public class InclusiveBetweenValidator<T, TProperty> : ICustomValidator<T, TProperty>, IInclusiveBetweenValidator {
 
 		public InclusiveBetweenValidator(IComparable from, IComparable to) {
 			To = to;
@@ -32,18 +30,22 @@ namespace FluentValidation.Validators {
 			if (to.CompareTo(from) == -1) {
 				throw new ArgumentOutOfRangeException(nameof(to), "To should be larger than from.");
 			}
-
 		}
 
 		public IComparable From { get; }
 		public IComparable To { get; }
 
-		protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule
+			.Custom(Validate)
+			.WithErrorCode("InclusiveBetweenValidator")
+			.WithMessageFromLanguageManager("InclusiveBetweenValidator");
+
+		protected void Validate(IPropertyValidatorContext<T,TProperty> context) {
 			var propertyValue = context.PropertyValue as IComparable;
 
 			// If the value is null then we abort and assume success.
 			// This should not be a failure condition - only a NotNull/NotEmpty should cause a null to fail.
-			if (propertyValue == null) return true;
+			if (propertyValue == null) return;
 
 			if (propertyValue.CompareTo(From) < 0 || propertyValue.CompareTo(To) > 0) {
 
@@ -52,17 +54,12 @@ namespace FluentValidation.Validators {
 					.AppendArgument("To", To)
 					.AppendArgument("Value", context.PropertyValue);
 
-				return false;
+				context.AddFailure();
 			}
-			return true;
-		}
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
 		}
 	}
 
-	public interface IBetweenValidator : IPropertyValidator {
+	public interface IBetweenValidator : ICustomValidator {
 		IComparable From { get; }
 		IComparable To { get; }
 	}

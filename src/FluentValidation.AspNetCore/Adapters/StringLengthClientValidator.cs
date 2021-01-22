@@ -24,8 +24,7 @@ namespace FluentValidation.AspNetCore {
 	using Validators;
 
 	internal class StringLengthClientValidator : ClientValidatorBase {
-		public StringLengthClientValidator(IValidationRule rule, IPropertyValidator validator)
-			: base(rule, validator) {
+		public StringLengthClientValidator(IValidationRule rule, ICustomValidator validator, IPropertyValidator options) : base(rule, validator, options) {
 		}
 
 		public override void AddValidation(ClientModelValidationContext context) {
@@ -47,10 +46,10 @@ namespace FluentValidation.AspNetCore {
 
 			string message;
 			try {
-				message = lengthVal.GetUnformattedErrorMessage();
+				message = Options.GetUnformattedErrorMessage();
 			}
 			catch (NullReferenceException) {
-				if (lengthVal.Name == "ExactLengthValidator") {
+				if (Validator is IExactLengthValidator) {
 					message = cfg.LanguageManager.GetString("ExactLength_Simple");
 				}
 				else {
@@ -60,7 +59,7 @@ namespace FluentValidation.AspNetCore {
 
 
 			if (message.Contains("{TotalLength}")) {
-				if (lengthVal.Name == "ExactLengthValidator") {
+				if (Validator is IExactLengthValidator) {
 					message = cfg.LanguageManager.GetString("ExactLength_Simple");
 				}
 				else {

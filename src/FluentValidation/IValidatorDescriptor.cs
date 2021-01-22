@@ -34,12 +34,12 @@ namespace FluentValidation {
 		/// <summary>
 		/// Gets a collection of validators grouped by property.
 		/// </summary>
-		ILookup<string, IPropertyValidator> GetMembersWithValidators();
+		ILookup<string, (ICustomValidator CustomValidator, IPropertyValidator Options)> GetMembersWithValidators();
 
 		/// <summary>
 		/// Gets validators for a particular property.
 		/// </summary>
-		IEnumerable<IPropertyValidator> GetValidatorsForMember(string name);
+		IEnumerable<(ICustomValidator CustomValidator, IPropertyValidator Options)> GetValidatorsForMember(string name);
 
 		/// <summary>
 		/// Gets rules for a property.

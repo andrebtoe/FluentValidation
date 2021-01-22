@@ -19,22 +19,20 @@
 namespace FluentValidation.Validators {
 	using Resources;
 
-	public class NullValidator<T,TProperty> : PropertyValidator<T,TProperty>, INullValidator {
+	public class NullValidator<T,TProperty> : ICustomValidator<T,TProperty>, INullValidator {
 
-		public override string Name => "NullValidator";
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule
+			.Custom(Validate)
+			.WithErrorCode("NullValidator")
+			.WithMessageFromLanguageManager("NullValidator");
 
-		protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
+		protected void Validate(IPropertyValidatorContext<T,TProperty> context) {
 			if (context.PropertyValue != null) {
-				return false;
+				context.AddFailure();
 			}
-			return true;
-		}
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
 		}
 	}
 
-	public interface INullValidator : IPropertyValidator {
+	public interface INullValidator : ICustomValidator {
 	}
 }

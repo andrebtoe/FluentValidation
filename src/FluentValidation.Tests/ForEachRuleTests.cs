@@ -144,10 +144,15 @@ namespace FluentValidation.Tests {
 			public Person person = null;
 		}
 
-		private class MyAsyncNotNullValidator<T,TProperty> : NotNullValidator<T,TProperty> {
-			public override bool ShouldValidateAsynchronously(IValidationContext context) {
-				return context.IsAsync();
-			}
+		private class MyAsyncNotNullValidator<T,TProperty> : NotNullValidator<T,TProperty>, ICustomValidator<T,TProperty> {
+			void ICustomValidator<T, TProperty>.Configure(ICustomRuleBuilder<T, TProperty> rule)
+				=> rule.Custom(action: null, asyncAction: (context, cancel) => {
+					if (context.PropertyValue == null) {
+						context.AddFailure();
+					}
+
+					return Task.CompletedTask;
+				});
 		}
 
 		[Fact]
@@ -310,12 +315,10 @@ namespace FluentValidation.Tests {
 			}
 		}
 
-		public class AppropriatenessAnswerViewModelRequiredValidator<T,TProperty> : PropertyValidator<T,TProperty> {
+		public class AppropriatenessAnswerViewModelRequiredValidator<T,TProperty> : ICustomValidator<T,TProperty> {
 
-			public override string Name => "AppropriatenessAnswerViewModelRequiredValidator";
-
-			protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
-				return false;
+			public void Configure(ICustomRuleBuilder<T, TProperty> rule) {
+				rule.Custom(ctx => ctx.AddFailure());
 			}
 		}
 

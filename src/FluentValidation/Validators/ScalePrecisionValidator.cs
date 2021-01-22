@@ -36,13 +36,16 @@ namespace FluentValidation.Validators {
 	/// 123.4500 has an scale of 4 and a precision of 7, but an effective scale
 	/// and precision of 2 and 5 respectively.
 	/// </summary>
-	public class ScalePrecisionValidator<T, TProperty> : PropertyValidator<T, TProperty> {
+	public class ScalePrecisionValidator<T, TProperty> : ICustomValidator<T, TProperty> {
 		//TODO: Rewrite so the generic isn't open and can be constrained to either decimal or nullable<decimal>
 		public ScalePrecisionValidator(int scale, int precision) {
 			Init(scale, precision);
 		}
 
-		public override string Name => "ScalePrecisionValidator";
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule
+			.Custom(Validate)
+			.WithErrorCode("ScalePrecisionValidator")
+			.WithMessageFromLanguageManager("ScalePrecisionValidator");
 
 		public int Scale { get; set; }
 
@@ -50,7 +53,7 @@ namespace FluentValidation.Validators {
 
 		public bool IgnoreTrailingZeros { get; set; }
 
-		protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
+		protected void Validate(IPropertyValidatorContext<T,TProperty> context) {
 			var decimalValue = context.PropertyValue as decimal?;
 
 			if (decimalValue.HasValue) {
@@ -65,11 +68,9 @@ namespace FluentValidation.Validators {
 						.AppendArgument("Digits", actualIntegerDigits)
 						.AppendArgument("ActualScale", scale);
 
-					return false;
+					context.AddFailure();
 				}
 			}
-
-			return true;
 		}
 
 		private void Init(int scale, int precision) {
@@ -136,10 +137,6 @@ namespace FluentValidation.Validators {
 			}
 
 			return (int) precision;
-		}
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
 		}
 	}
 }

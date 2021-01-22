@@ -19,15 +19,10 @@
 namespace FluentValidation.Validators {
 	using System;
 	using System.Linq;
-	using System.Reflection;
-	using FluentValidation.Internal;
-	using Resources;
 
-	public class StringEnumValidator<T> : PropertyValidator<T, string> {
+	public class StringEnumValidator<T> : ICustomValidator<T, string> {
 		private readonly Type _enumType;
 		private readonly bool _caseSensitive;
-
-		public override string Name => "StringEnumValidator";
 
 		public StringEnumValidator(Type enumType, bool caseSensitive) {
 			if (enumType == null) throw new ArgumentNullException(nameof(enumType));
@@ -38,25 +33,25 @@ namespace FluentValidation.Validators {
 			_caseSensitive = caseSensitive;
 		}
 
-		protected override bool IsValid(PropertyValidatorContext<T,string> context) {
-			if (context.PropertyValue == null) return true;
+		public void Configure(ICustomRuleBuilder<T, string> rule) => rule
+			.Custom(Validate)
+			.WithErrorCode("StringEnumValidator")
+			.WithMessageFromLanguageManager("EnumValidator"); // Intentionally the same message as EnumValidator.
 
-			string value = context.PropertyValue.ToString();
+		protected void Validate(IPropertyValidatorContext<T,string> context) {
+			if (context.PropertyValue == null) return;
 			var comparison = _caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-
-			return Enum.GetNames(_enumType).Any(n => n.Equals(value, comparison));
+			bool valid = Enum.GetNames(_enumType).Any(n => n.Equals(context.PropertyValue, comparison));
+			if (!valid) {
+				context.AddFailure();
+			}
 		}
 
-		private void CheckTypeIsEnum(Type enumType) {
+		private static void CheckTypeIsEnum(Type enumType) {
 			if (!enumType.IsEnum) {
 				string message = $"The type '{enumType.Name}' is not an enum and can't be used with IsEnumName.";
 				throw new ArgumentOutOfRangeException(nameof(enumType), message);
 			}
-		}
-
-		protected override string GetDefaultMessageTemplate() {
-			// Intentionally the same message as EnumValidator.
-			return Localized("EnumValidator");
 		}
 	}
 }

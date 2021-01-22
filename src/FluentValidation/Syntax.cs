@@ -18,6 +18,8 @@
 
 namespace FluentValidation {
 	using System;
+	using System.Threading;
+	using System.Threading.Tasks;
 	using Internal;
 	using Validators;
 
@@ -35,6 +37,14 @@ namespace FluentValidation {
 	/// <typeparam name="T"></typeparam>
 	/// <typeparam name="TProperty"></typeparam>
 	public interface IRuleBuilder<T, out TProperty> {
+
+		/// <summary>
+		/// Associates a custom validator with this the property for this rule.
+		/// </summary>
+		/// <param name="validator">The validator to set</param>
+		/// <returns></returns>
+		IRuleBuilderOptions<T, TProperty> SetValidator(ICustomValidator<T, TProperty> validator);
+
 		/// <summary>
 		/// Associates an instance of IValidator with the current property rule.
 		/// </summary>
@@ -57,7 +67,6 @@ namespace FluentValidation {
 		/// <param name="ruleSets"></param>
 		IRuleBuilderOptions<T, TProperty> SetValidator<TValidator>(Func<T, TProperty, TValidator> validatorProvider, params string[] ruleSets)
 			where TValidator : IValidator<TProperty>;
-
 	}
 
 
@@ -74,6 +83,18 @@ namespace FluentValidation {
 		/// Creates a scope for declaring dependent rules.
 		/// </summary>
 		IRuleBuilderOptions<T, TProperty> DependentRules(Action action);
+	}
+
+
+
+	public interface ICustomRuleBuilder<T, out TProperty> {
+		/// <summary>
+		/// Defines a custom validation rule
+		/// </summary>
+		/// <param name="action">The action to be invoked when the validator is run.</param>
+		/// <param name="asyncAction">(Optional) The async action to be invoked when the validator is run.</param>
+		/// <returns></returns>
+		IRuleBuilderOptions<T, TProperty> Custom(Action<IPropertyValidatorContext<T, TProperty>> action, Func<IPropertyValidatorContext<T,TProperty>, CancellationToken, Task> asyncAction = null);
 	}
 
 	/// <summary>

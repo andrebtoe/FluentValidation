@@ -1,10 +1,7 @@
 namespace FluentValidation.Internal {
 	using System;
-	using System.Collections.Generic;
-	using System.Linq;
 	using System.Threading;
 	using System.Threading.Tasks;
-	using Results;
 	using Validators;
 
 	/// <summary>
@@ -24,7 +21,8 @@ namespace FluentValidation.Internal {
 		/// <param name="typeToValidate"></param>
 		public IncludeRule(IValidator<T> validator, Func<CascadeMode> cascadeModeThunk, Type typeToValidate)
 			: base(null, x => x, null, cascadeModeThunk, typeToValidate) {
-			AddValidator(new ChildValidatorAdaptor<T,T>(validator, validator.GetType()));
+			var adaptor = new ChildValidatorAdaptor<T, T>(validator, validator.GetType());
+			SetValidator(adaptor);
 		}
 
 		/// <summary>
@@ -34,9 +32,10 @@ namespace FluentValidation.Internal {
 		/// <param name="cascadeModeThunk"></param>
 		/// <param name="typeToValidate"></param>
 		/// <param name="validatorType"></param>
-		public IncludeRule(Func<PropertyValidatorContext<T,T>, IValidator<T>> func,  Func<CascadeMode> cascadeModeThunk, Type typeToValidate, Type validatorType)
+		public IncludeRule(Func<IPropertyValidatorContext<T,T>, IValidator<T>> func,  Func<CascadeMode> cascadeModeThunk, Type typeToValidate, Type validatorType)
 			: base(null, x => x, null, cascadeModeThunk, typeToValidate) {
-			AddValidator(new ChildValidatorAdaptor<T,T>(func,  validatorType));
+			var adaptor = new ChildValidatorAdaptor<T, T>(func, validatorType);
+			SetValidator(adaptor);
 		}
 
 		/// <summary>

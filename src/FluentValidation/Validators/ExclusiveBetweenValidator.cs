@@ -21,10 +21,7 @@ namespace FluentValidation.Validators {
 	using Internal;
 	using Resources;
 
-	public class ExclusiveBetweenValidator<T,TProperty> : PropertyValidator<T,TProperty>, IBetweenValidator {
-
-		public override string Name => "ExclusiveBetweenValidator";
-
+	public class ExclusiveBetweenValidator<T,TProperty> : ICustomValidator<T,TProperty>, IBetweenValidator {
 		public ExclusiveBetweenValidator(IComparable from, IComparable to) {
 			To = to;
 			From = from;
@@ -34,30 +31,29 @@ namespace FluentValidation.Validators {
 			}
 		}
 
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule
+			.Custom(Validate)
+			.WithErrorCode("ExclusiveBetweenValidator")
+			.WithMessageFromLanguageManager("ExclusiveBetweenValidator");
+
 		public IComparable From { get; }
 		public IComparable To { get; }
 
-		protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
+		protected void Validate(IPropertyValidatorContext<T,TProperty> context) {
 			var propertyValue = context.PropertyValue as IComparable;
 
 			// If the value is null then we abort and assume success.
 			// This should not be a failure condition - only a NotNull/NotEmpty should cause a null to fail.
-			if (propertyValue == null) return true;
+			if (propertyValue == null) return;
 
 			if (propertyValue.CompareTo(From) <= 0 || propertyValue.CompareTo(To) >= 0) {
-
 				context.MessageFormatter
 					.AppendArgument("From", From)
 					.AppendArgument("To", To)
 					.AppendArgument("Value", context.PropertyValue);
 
-				return false;
+				context.AddFailure();
 			}
-			return true;
-		}
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
 		}
 	}
 }

@@ -20,32 +20,33 @@ namespace FluentValidation.Validators {
 	using System;
 	using System.Threading;
 	using System.Threading.Tasks;
-	using FluentValidation.Internal;
-	using FluentValidation.Resources;
+	using Internal;
 
 	/// <summary>
 	/// Asynchronous custom validator
 	/// </summary>
-	public class AsyncPredicateValidator<T,TProperty> : AsyncPropertyValidator<T,TProperty> {
-		private readonly Func<T, TProperty, PropertyValidatorContext<T,TProperty>, CancellationToken, Task<bool>> _predicate;
-
-		public override string Name => "AsyncPredicateValidator";
+	public class AsyncPredicateValidator<T,TProperty> : ICustomValidator<T,TProperty> {
+		private readonly Func<T, TProperty, IPropertyValidatorContext<T,TProperty>, CancellationToken, Task<bool>> _predicate;
 
 		/// <summary>
 		/// Creates a new AsyncPredicateValidator
 		/// </summary>
 		/// <param name="predicate"></param>
-		public AsyncPredicateValidator(Func<T, TProperty, PropertyValidatorContext<T,TProperty>, CancellationToken, Task<bool>> predicate) {
+		public AsyncPredicateValidator(Func<T, TProperty, IPropertyValidatorContext<T,TProperty>, CancellationToken, Task<bool>> predicate) {
 			predicate.Guard("A predicate must be specified.", nameof(predicate));
-			this._predicate = predicate;
+			_predicate = predicate;
 		}
 
-		protected override Task<bool> IsValidAsync(PropertyValidatorContext<T,TProperty> context, CancellationToken cancellation) {
-			return _predicate(context.InstanceToValidate, context.PropertyValue, context, cancellation);
-		}
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule
+			.Custom(action: null, asyncAction: ValidateAsync)
+			.WithErrorCode("AsyncPredicateValidator")
+			.WithMessageFromLanguageManager("AsyncPredicateValidator");
 
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
+		protected async Task ValidateAsync(IPropertyValidatorContext<T,TProperty> context, CancellationToken cancellation) {
+			bool valid = await _predicate(context.InstanceToValidate, context.PropertyValue, context, cancellation);
+			if (!valid) {
+				context.AddFailure();
+			}
 		}
 	}
 }

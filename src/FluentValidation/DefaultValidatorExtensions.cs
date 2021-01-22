@@ -34,27 +34,6 @@ namespace FluentValidation {
 	/// Extension methods that provide the default set of validators.
 	/// </summary>
 	public static partial class DefaultValidatorExtensions {
-		/// <summary>
-		/// Associates a validator with this the property for this rule builder.
-		/// </summary>
-		/// <param name="ruleBuilder"></param>
-		/// <param name="validator">The validator to set</param>
-		/// <returns></returns>
-		public static IRuleBuilderOptions<T, TProperty> SetValidator<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, CustomValidator<T, TProperty> validator) {
-			if (validator == null) throw new ArgumentNullException(nameof(validator));
-
-			if (ruleBuilder is IExecutableValidationRule<T> r) {
-				// Starting a new chain.
-				validator.ParentRule = r;
-				((IValidationRule<T, TProperty>) r).AddValidator(validator);
-			}
-			else if (ruleBuilder is CustomValidator<T, TProperty> cv) {
-				// Adding validator to existing chain.
-				validator.ParentRule = cv.ParentRule;
-				((IValidationRule<T, TProperty>) validator.ParentRule).AddValidator(validator);
-			}
-			return validator;
-		}
 
 		/// <summary>
 		/// Defines a 'not null' validator on the current rule builder.
@@ -263,7 +242,7 @@ namespace FluentValidation {
 		/// <returns></returns>
 		public static IRuleBuilderOptions<T, string> EmailAddress<T>(this IRuleBuilder<T, string> ruleBuilder, EmailValidationMode mode = EmailValidationMode.AspNetCoreCompatible) {
 #pragma warning disable 618
-			var validator = mode == EmailValidationMode.AspNetCoreCompatible ? new AspNetCoreCompatibleEmailValidator<T>() : (PropertyValidator<T,string>)new EmailValidator<T>();
+			var validator = mode == EmailValidationMode.AspNetCoreCompatible ? new AspNetCoreCompatibleEmailValidator<T>() : (ICustomValidator<T,string>)new EmailValidator<T>();
 #pragma warning restore 618
 			return ruleBuilder.SetValidator(validator);
 		}
@@ -392,7 +371,7 @@ namespace FluentValidation {
 		/// <param name="ruleBuilder">The rule builder on which the validator should be defined</param>
 		/// <param name="predicate">A lambda expression specifying the predicate</param>
 		/// <returns></returns>
-		public static IRuleBuilderOptions<T, TProperty> Must<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<T, TProperty, PropertyValidatorContext<T,TProperty>, bool> predicate) {
+		public static IRuleBuilderOptions<T, TProperty> Must<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<T, TProperty, IPropertyValidatorContext<T,TProperty>, bool> predicate) {
 			predicate.Guard("Cannot pass a null predicate to Must.", nameof(predicate));
 			return ruleBuilder.SetValidator(new PredicateValidator<T,TProperty>((instance, property, propertyValidatorContext) => predicate(instance, property, propertyValidatorContext)));
 		}
@@ -409,7 +388,6 @@ namespace FluentValidation {
 		/// <returns></returns>
 		public static IRuleBuilderOptions<T, TProperty> MustAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<TProperty, CancellationToken, Task<bool>> predicate) {
 			predicate.Guard("Cannot pass a null predicate to Must.", nameof(predicate));
-
 			return ruleBuilder.MustAsync((x, val, ctx, cancel) => predicate(val, cancel));
 		}
 
@@ -440,7 +418,7 @@ namespace FluentValidation {
 		/// <param name="ruleBuilder">The rule builder on which the validator should be defined</param>
 		/// <param name="predicate">A lambda expression specifying the predicate</param>
 		/// <returns></returns>
-		public static IRuleBuilderOptions<T, TProperty> MustAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<T, TProperty, PropertyValidatorContext<T,TProperty>, CancellationToken, Task<bool>> predicate) {
+		public static IRuleBuilderOptions<T, TProperty> MustAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<T, TProperty, IPropertyValidatorContext<T,TProperty>, CancellationToken, Task<bool>> predicate) {
 			predicate.Guard("Cannot pass a null predicate to Must.", nameof(predicate));
 			return ruleBuilder.SetValidator(new AsyncPredicateValidator<T,TProperty>(predicate));
 		}
@@ -1002,25 +980,8 @@ namespace FluentValidation {
 		/// <param name="ruleBuilder"></param>
 		/// <param name="action"></param>
 		/// <returns></returns>
-		public static IRuleBuilderOptions<T, TProperty> Custom<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Action<PropertyValidatorContext<T,TProperty>> action) {
-			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty> {
-				ValidationAction = action
-			}).WithErrorCode("CustomValidator");
-		}
-
-
-		/// <summary>
-		/// Defines a custom validation rule
-		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <typeparam name="TProperty"></typeparam>
-		/// <param name="ruleBuilder"></param>
-		/// <param name="action"></param>
-		/// <returns></returns>
-		public static IRuleBuilderOptions<T, TProperty> Custom<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Action<TProperty, PropertyValidatorContext<T,TProperty>> action) {
-			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty> {
-				ValidationAction = context => action(context.PropertyValue, context)
-			}).WithErrorCode("CustomValidator");
+		public static IRuleBuilderOptions<T, TProperty> Custom<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Action<IPropertyValidatorContext<T,TProperty>> action) {
+			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty>(action));
 		}
 
 		/// <summary>
@@ -1031,10 +992,8 @@ namespace FluentValidation {
 		/// <param name="ruleBuilder"></param>
 		/// <param name="action"></param>
 		/// <returns></returns>
-		public static IRuleBuilderOptions<T, TProperty> CustomAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<TProperty, PropertyValidatorContext<T,TProperty>, CancellationToken, Task> action) {
-			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty> {
-				AsyncValidationAction = (context, cancel) => action(context.PropertyValue, context, cancel)
-			}).WithErrorCode("CustomValidator");
+		public static IRuleBuilderOptions<T, TProperty> Custom<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Action<TProperty, IPropertyValidatorContext<T,TProperty>> action) {
+			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty>(context => action(context.PropertyValue, context)));
 		}
 
 		/// <summary>
@@ -1045,10 +1004,20 @@ namespace FluentValidation {
 		/// <param name="ruleBuilder"></param>
 		/// <param name="action"></param>
 		/// <returns></returns>
-		public static IRuleBuilderOptions<T, TProperty> CustomAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<PropertyValidatorContext<T,TProperty>, CancellationToken, Task> action) {
-			return ruleBuilder.SetValidator(new CustomValidator<T, TProperty> {
-				AsyncValidationAction = action
-			}).WithErrorCode("CustomValidator");
+		public static IRuleBuilderOptions<T, TProperty> CustomAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<TProperty, IPropertyValidatorContext<T,TProperty>, CancellationToken, Task> action) {
+			return ruleBuilder.SetValidator(new AsyncCustomValidator<T, TProperty>((context, cancel) => action(context.PropertyValue, context, cancel)));
+		}
+
+		/// <summary>
+		/// Defines a custom validation rule
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <typeparam name="TProperty"></typeparam>
+		/// <param name="ruleBuilder"></param>
+		/// <param name="action"></param>
+		/// <returns></returns>
+		public static IRuleBuilderOptions<T, TProperty> CustomAsync<T, TProperty>(this IRuleBuilder<T, TProperty> ruleBuilder, Func<IPropertyValidatorContext<T,TProperty>, CancellationToken, Task> action) {
+			return ruleBuilder.SetValidator(new AsyncCustomValidator<T, TProperty>(action));
 		}
 
 		/// <summary>

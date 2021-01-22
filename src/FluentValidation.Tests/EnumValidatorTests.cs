@@ -16,18 +16,15 @@
 // The latest version of this file can be found at https://github.com/FluentValidation/FluentValidation
 #endregion
 
-namespace FluentValidation.Tests
-{
+namespace FluentValidation.Tests {
 	using System;
 	using System.Linq;
 	using Xunit;
 
-	public class EnumValidatorTests
-	{
+	public class EnumValidatorTests {
 		TestValidator validator;
 
-		public EnumValidatorTests()
-		{
+		public EnumValidatorTests() {
 			CultureScope.SetDefaultCulture();
 
 			validator = new TestValidator {
@@ -36,38 +33,34 @@ namespace FluentValidation.Tests
 		}
 
 		[Fact]
-		public void IsValidTests()
-		{
+		public void IsValidTests() {
 			validator.Validate(new Person { Gender = EnumGender.Female }).IsValid.ShouldBeTrue();  // Simplest valid value
 			validator.Validate(new Person { Gender = EnumGender.Male }).IsValid.ShouldBeTrue();    // Other valid value
 			validator.Validate(new Person { Gender = (EnumGender)1 }).IsValid.ShouldBeTrue();      // Casting with valid value
 		}
 
 		[Fact]
-		public void When_the_enum_is_not_initialized_with_valid_value_then_the_validator_should_fail()
-		{
-			var result = validator.Validate(new Person());                                         // Default value 0 is not defined in Enum
+		public void When_the_enum_is_not_initialized_with_valid_value_then_the_validator_should_fail() {
+			var result = validator.Validate(new Person());
+			// Default value 0 is not defined in Enum
 			result.IsValid.ShouldBeFalse();
 		}
 
 		[Fact]
-		public void When_the_enum_is_initialized_with_invalid_value_then_the_validator_should_fail()
-		{
-			var result = validator.Validate(new Person { Gender = (EnumGender)3 });                // 3 in not defined in Enum
+		public void When_the_enum_is_initialized_with_invalid_value_then_the_validator_should_fail() {
+			var result = validator.Validate(new Person { Gender = (EnumGender)3 });
+			// 3 in not defined in Enum
 			result.IsValid.ShouldBeFalse();
 		}
 
-
 		[Fact]
-		public void When_validation_fails_the_default_error_should_be_set()
-		{
+		public void When_validation_fails_the_default_error_should_be_set() {
 			var result = validator.Validate(new Person());
 			result.Errors.Single().ErrorMessage.ShouldEqual("'Gender' has a range of values which does not include '0'.");
 		}
 
 		[Fact]
-		public void Nullable_enum_valid_when_property_value_is_null()
-		{
+		public void Nullable_enum_valid_when_property_value_is_null() {
 			var validator = new InlineValidator<Foo>();
 			validator.RuleFor(x => x.Gender).IsInEnum();
 			var result = validator.Validate(new Foo());
@@ -75,8 +68,7 @@ namespace FluentValidation.Tests
 		}
 
 		[Fact]
-		public void Nullable_enum_valid_when_value_specified()
-		{
+		public void Nullable_enum_valid_when_value_specified() {
 			var validator = new InlineValidator<Foo>();
 			validator.RuleFor(x => x.Gender).IsInEnum();
 			var result = validator.Validate(new Foo() { Gender = EnumGender.Male });
@@ -84,8 +76,7 @@ namespace FluentValidation.Tests
 		}
 
 		[Fact]
-		public void Nullable_enum_invalid_when_bad_value_specified()
-		{
+		public void Nullable_enum_invalid_when_bad_value_specified() {
 			var validator = new InlineValidator<Foo>();
 			validator.RuleFor(x => x.Gender).IsInEnum();
 			var result = validator.Validate(new Foo() { Gender = (EnumGender)42 });
@@ -93,8 +84,7 @@ namespace FluentValidation.Tests
 		}
 
 		[Fact]
-		public void Flags_enum_valid_when_using_bitwise_value()
-		{
+		public void Flags_enum_valid_when_using_bitwise_value() {
 			var inlineValidator = Create_validator();
 			var poco = new FlagsEnumPoco();
 			poco.PopulateWithValidValues();
@@ -109,8 +99,7 @@ namespace FluentValidation.Tests
 		}
 
 		[Fact]
-		public void Flags_enum_with_overlapping_flags_valid_when_using_bitwise_value()
-		{
+		public void Flags_enum_with_overlapping_flags_valid_when_using_bitwise_value() {
 			var inlineValidator = new InlineValidator<FlagsEnumPoco>();
 			inlineValidator.RuleFor(x => x.EnumWithOverlappingFlagsValue).IsInEnum();
 
@@ -131,8 +120,7 @@ namespace FluentValidation.Tests
 		}
 
 		[Fact]
-		public void Flags_enum_validates_correctly_when_using_zero_value()
-		{
+		public void Flags_enum_validates_correctly_when_using_zero_value() {
 			var inlineValidator = Create_validator();
 
 			var poco = new FlagsEnumPoco();
@@ -147,8 +135,7 @@ namespace FluentValidation.Tests
 		}
 
 		[Fact]
-		public void Flags_enum_invalid_when_using_outofrange_positive_value()
-		{
+		public void Flags_enum_invalid_when_using_outofrange_positive_value() {
 			var inlineValidator = Create_validator();
 
 			var poco = new FlagsEnumPoco();
@@ -168,8 +155,7 @@ namespace FluentValidation.Tests
 		}
 
 		[Fact]
-		public void Flags_enum_invalid_when_using_outofrange_negative_value()
-		{
+		public void Flags_enum_invalid_when_using_outofrange_negative_value() {
 			var inlineValidator = Create_validator();
 
 			var poco = new FlagsEnumPoco();
@@ -183,8 +169,7 @@ namespace FluentValidation.Tests
 			result.Errors.SingleOrDefault(x => x.PropertyName == "Int64Value").ShouldNotBeNull();
 		}
 
-		private InlineValidator<FlagsEnumPoco> Create_validator()
-		{
+		private InlineValidator<FlagsEnumPoco> Create_validator() {
 			var inlineValidator = new InlineValidator<FlagsEnumPoco>();
 			inlineValidator.RuleFor(x => x.SByteValue).IsInEnum();
 			inlineValidator.RuleFor(x => x.ByteValue).IsInEnum();
@@ -200,14 +185,12 @@ namespace FluentValidation.Tests
 			return inlineValidator;
 		}
 
-		private class Foo
-		{
+		private class Foo {
 			public EnumGender? Gender { get; set; }
 		}
 
 		#region Flag enum helpers
-		private class FlagsEnumPoco
-		{
+		private class FlagsEnumPoco {
 			public SByteEnum SByteValue { get; set; }
 			public ByteEnum ByteValue { get; set; }
 			public Int16Enum Int16Value { get; set; }
@@ -219,8 +202,7 @@ namespace FluentValidation.Tests
 			public EnumWithNegatives EnumWithNegativesValue { get; set; }
 			public EnumWithOverlappingFlags EnumWithOverlappingFlagsValue { get; set;}
 
-			public void PopulateWithValidValues()
-			{
+			public void PopulateWithValidValues() {
 				SByteValue = SByteEnum.B | SByteEnum.C;
 				ByteValue = ByteEnum.B | ByteEnum.C;
 				Int16Value = Int16Enum.B | Int16Enum.C;
@@ -233,8 +215,7 @@ namespace FluentValidation.Tests
 				EnumWithOverlappingFlagsValue = EnumWithOverlappingFlags.A;
 			}
 
-			public void PopulateWithInvalidPositiveValues()
-			{
+			public void PopulateWithInvalidPositiveValues() {
 				SByteValue = (SByteEnum)123;
 				ByteValue = (ByteEnum)123;
 				Int16Value = (Int16Enum)123;
@@ -247,8 +228,7 @@ namespace FluentValidation.Tests
 				EnumWithOverlappingFlagsValue = (EnumWithOverlappingFlags)123;
 			}
 
-			public void PopulateWithInvalidNegativeValues()
-			{
+			public void PopulateWithInvalidNegativeValues() {
 				SByteValue = (SByteEnum)(-123);
 				Int16Value = (Int16Enum)(-123);
 				Int32Value = (Int32Enum)(-123);
@@ -259,48 +239,42 @@ namespace FluentValidation.Tests
 		}
 
 		[Flags]
-		private enum SByteEnum : sbyte
-		{
+		private enum SByteEnum : sbyte {
 			A = 0,
 			B = 1,
 			C = 2
 		}
 
 		[Flags]
-		private enum ByteEnum : byte
-		{
+		private enum ByteEnum : byte {
 			A = 0,
 			B = 1,
 			C = 2
 		}
 
 		[Flags]
-		private enum Int16Enum : short
-		{
+		private enum Int16Enum : short {
 			A = 0,
 			B = 1,
 			C = 2
 		}
 
 		[Flags]
-		private enum UInt16Enum : ushort
-		{
+		private enum UInt16Enum : ushort {
 			A = 0,
 			B = 1,
 			C = 2
 		}
 
 		[Flags]
-		private enum Int32Enum : int
-		{
+		private enum Int32Enum : int {
 			A = 0,
 			B = 1,
 			C = 2
 		}
 
 		[Flags]
-		private enum UInt32Enum : uint
-		{
+		private enum UInt32Enum : uint {
 			A = 0,
 			B = 1,
 			C = 2
@@ -315,16 +289,14 @@ namespace FluentValidation.Tests
 		}
 
 		[Flags]
-		private enum UInt64Enum : ulong
-		{
+		private enum UInt64Enum : ulong {
 			A = 0,
 			B = 1,
 			C = 2
 		}
 
 		[Flags]
-		public enum EnumWithNegatives
-		{
+		public enum EnumWithNegatives {
 			All = ~0,
 			Bar = 1,
 			Foo = 2
@@ -332,8 +304,7 @@ namespace FluentValidation.Tests
 
 		// NB this enum actually confuses the built-in Enum.ToString() functionality - it shows 7 for A|B.
 		[Flags]
-		public enum EnumWithOverlappingFlags
-		{
+		public enum EnumWithOverlappingFlags {
 			A = 3,
 			B = 4,
 			C = 5

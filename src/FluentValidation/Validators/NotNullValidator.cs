@@ -17,25 +17,18 @@
 #endregion
 
 namespace FluentValidation.Validators {
-	using System;
-	using Resources;
+	public class NotNullValidator<T,TProperty> : ICustomValidator<T,TProperty>, INotNullValidator {
 
-	public class NotNullValidator<T,TProperty> : PropertyValidator<T,TProperty>, INotNullValidator {
-
-		public override string Name => "NotNullValidator";
-
-		protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
-			if (context.PropertyValue == null) {
-				return false;
-			}
-			return true;
-		}
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
-		}
+		public void Configure(ICustomRuleBuilder<T, TProperty> rule) => rule
+			.Custom(context => {
+				if (context.PropertyValue == null) {
+					context.AddFailure();
+				}
+			})
+			.WithErrorCode("NotNullValidator")
+			.WithMessageFromLanguageManager("NotNullValidator");
 	}
 
-	public interface INotNullValidator : IPropertyValidator {
+	public interface INotNullValidator : ICustomValidator {
 	}
 }

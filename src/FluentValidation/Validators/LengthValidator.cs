@@ -20,9 +20,7 @@ namespace FluentValidation.Validators {
 	using System;
 	using Resources;
 
-	public class LengthValidator<T> : PropertyValidator<T,string>, ILengthValidator {
-		public override string Name => "LengthValidator";
-
+	public class LengthValidator<T> : ICustomValidator<T,string>, ILengthValidator {
 		public int Min { get; }
 		public int Max { get; }
 
@@ -43,8 +41,14 @@ namespace FluentValidation.Validators {
 			MinFunc = min;
 		}
 
-		protected override bool IsValid(PropertyValidatorContext<T,string> context) {
-			if (context.PropertyValue == null) return true;
+		public virtual void Configure(ICustomRuleBuilder<T, string> rule) => rule
+			.Custom(IsValid)
+			.WithErrorCode("LengthValidator")
+			.WithMessageFromLanguageManager("LengthValidator");
+
+
+		protected void IsValid(IPropertyValidatorContext<T,string> context) {
+			if (context.PropertyValue == null) return;
 
 			var min = Min;
 			var max = Max;
@@ -62,55 +66,41 @@ namespace FluentValidation.Validators {
 					.AppendArgument("MaxLength", max)
 					.AppendArgument("TotalLength", length);
 
-				return false;
+				context.AddFailure();
 			}
-
-			return true;
-		}
-
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
 		}
 	}
 
 	public class ExactLengthValidator<T> : LengthValidator<T>, IExactLengthValidator {
-		public override string Name => "ExactLengthValidator";
-
 		public ExactLengthValidator(int length) : base(length,length) {
-
 		}
 
 		public ExactLengthValidator(Func<T, int> length)
 			: base(length, length) {
-
 		}
 
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
-		}
+		public override void Configure(ICustomRuleBuilder<T, string> rule) => rule
+			.Custom(IsValid)
+			.WithErrorCode("ExactLengthValidator")
+			.WithMessageFromLanguageManager("ExactLengthValidator");
 	}
 
 	public class MaximumLengthValidator<T> : LengthValidator<T>, IMinimumLengthValidator {
-		public override string Name => "MaximumLengthValidator";
-
 		public MaximumLengthValidator(int max)
 			: base(0, max) {
-
 		}
 
 		public MaximumLengthValidator(Func<T, int> max)
 			: base(obj => 0, max) {
-
 		}
 
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
-		}
+		public override void Configure(ICustomRuleBuilder<T, string> rule) => rule
+			.Custom(IsValid)
+			.WithErrorCode("MaximumLengthValidator")
+			.WithMessageFromLanguageManager("MaximumLengthValidator");
 	}
 
 	public class MinimumLengthValidator<T> : LengthValidator<T>, IMaximumLengthValidator {
-
-		public override string Name => "MinimumLengthValidator";
 
 		public MinimumLengthValidator(int min)
 			: base(min, -1) {
@@ -118,15 +108,16 @@ namespace FluentValidation.Validators {
 
 		public MinimumLengthValidator(Func<T, int> min)
 			: base(min, obj => -1) {
-
 		}
 
-		protected override string GetDefaultMessageTemplate() {
-			return Localized(Name);
-		}
+		public override void Configure(ICustomRuleBuilder<T, string> rule) => rule
+			.Custom(IsValid)
+			.WithErrorCode("MinimumLengthValidator")
+			.WithMessageFromLanguageManager("MinimumLengthValidator");
+
 	}
 
-	public interface ILengthValidator : IPropertyValidator {
+	public interface ILengthValidator : ICustomValidator {
 		int Min { get; }
 		int Max { get; }
 	}

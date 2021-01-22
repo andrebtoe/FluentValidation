@@ -96,10 +96,12 @@
 		}
 
 		[Fact]
-		public void Always_use_specific_language_with_string_source() {
+		public void Always_use_specific_language_when_validator_configured_with_localized_message() {
 			ValidatorOptions.Global.LanguageManager.Culture = new CultureInfo("fr-FR");
-			var validator = new NotNullValidator<Person,string>();
-			var msg = validator.GetErrorMessage(null);
+			var validator = new InlineValidator<Person>();
+			validator.RuleFor(x => x.Forename).NotNull();
+			var msg = validator.First().Validators.First().Options.GetUnformattedErrorMessage();
+
 			ValidatorOptions.Global.LanguageManager.Culture = null;
 
 			msg.ShouldEqual("'{PropertyName}' ne doit pas avoir la valeur null.");
@@ -261,14 +263,6 @@
 			public CustomLanguageManager() {
 				AddTranslation("fr", "NotNullValidator", "foo");
 				AddTranslation("fr", "CustomKey", "bar");
-			}
-		}
-
-		private class TestValidator<T,TProperty> : PropertyValidator<T,TProperty> {
-			public override string Name => "TestValidator";
-
-			protected override bool IsValid(PropertyValidatorContext<T,TProperty> context) {
-				return true;
 			}
 		}
 	}

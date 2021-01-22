@@ -22,7 +22,47 @@ namespace FluentValidation.Validators {
 	using Internal;
 	using Results;
 
-	public class PropertyValidatorContext<T, TProperty> {
+	public interface IPropertyValidatorContext<out TProperty> {
+		string PropertyName { get; }
+		string DisplayName { get; }
+
+		string RawPropertyName { get; }
+
+		MessageFormatter MessageFormatter { get; }
+		TProperty PropertyValue { get; }
+
+		/// <summary>
+		/// Adds a new validation failure.
+		/// </summary>
+		/// <param name="failure">The failure to add.</param>
+		/// <exception cref="ArgumentNullException"></exception>
+		void AddFailure(ValidationFailure failure);
+
+		/// <summary>
+		/// Adds a new validation failure.
+		/// </summary>
+		/// <param name="propertyName">The property name</param>
+		/// <param name="errorMessage">The error message</param>
+		void AddFailure(string propertyName, string errorMessage);
+
+		/// <summary>
+		/// Adds a new validation failure (the property name is inferred)
+		/// </summary>
+		/// <param name="errorMessage">The error message</param>
+		void AddFailure(string errorMessage);
+
+		void AddFailure();
+
+	}
+
+	public interface IPropertyValidatorContext<T, out TProperty> : IPropertyValidatorContext<TProperty> {
+		ValidationContext<T> ParentContext { get; }
+
+		T InstanceToValidate { get; }
+	}
+
+
+	public class PropertyValidatorContext<T, TProperty> : IPropertyValidatorContext<T,TProperty> {
 		private TProperty _propertyValue;
 		private Lazy<TProperty> _propertyValueAccessor;
 
@@ -33,10 +73,13 @@ namespace FluentValidation.Validators {
 
 		public string DisplayName => Rule.GetDisplayName(ParentContext);
 
+		public string RawPropertyName => Rule.PropertyName;
+
 		public T InstanceToValidate => ParentContext.InstanceToValidate;
 		public MessageFormatter MessageFormatter => ParentContext.MessageFormatter;
 
-		internal CustomValidator<T,TProperty> ValidatorInstance { get; private set; }
+		internal ICustomValidator<T, TProperty> ValidatorInstance { get; private set; }
+		internal PropertyValidatorOptions<T,TProperty> Options { get; private set; }
 
 		//Lazily load the property value
 		//to allow the delegating validator to cancel validation before value is obtained
@@ -93,23 +136,23 @@ namespace FluentValidation.Validators {
 			PrepareMessageFormatter();
 
 			var error = Rule.MessageBuilder != null
-				? Rule.MessageBuilder(new MessageBuilderContext<T,TProperty>(this, ValidatorInstance))
-				: ValidatorInstance.GetErrorMessage(this);
+				? Rule.MessageBuilder(new MessageBuilderContext<T,TProperty>(this, ValidatorInstance, Options))
+				: Options.GetErrorMessage(this);
 
 			var failure = new ValidationFailure(PropertyName, error, PropertyValue);
 			failure.FormattedMessagePlaceholderValues = MessageFormatter.PlaceholderValues;
-			failure.ErrorCode = ValidatorInstance.ErrorCode ?? ValidatorOptions.Global.ErrorCodeResolver(ValidatorInstance);
+			failure.ErrorCode = ValidatorOptions.Global.ErrorCodeResolver(ValidatorInstance, Options);
 
-			if (ValidatorInstance.CustomStateProvider != null) {
-				failure.CustomState = ValidatorInstance.CustomStateProvider(this);
+			if (Options.CustomStateProvider != null) {
+				failure.CustomState = Options.CustomStateProvider(this);
 			}
 
-			if (ValidatorInstance.SeverityProvider != null) {
-				failure.Severity = ValidatorInstance.SeverityProvider(this);
+			if (Options.SeverityProvider != null) {
+				failure.Severity = Options.SeverityProvider(this);
 			}
 
-			if (ValidatorInstance.OnFailure != null) {
-				ValidatorInstance.OnFailure(InstanceToValidate, this, failure.ErrorMessage);
+			if (Options.OnFailure != null) {
+				Options.OnFailure(InstanceToValidate, this, failure.ErrorMessage);
 			}
 
 			ParentContext.Failures.Add(failure);
@@ -132,9 +175,11 @@ namespace FluentValidation.Validators {
 			}
 		}
 
-		public void Initialize(CustomValidator<T,TProperty> validator) {
+		internal void Initialize(ICustomValidator<T,TProperty> validatorInstance, PropertyValidatorOptions<T,TProperty> options) {
 			ParentContext.MessageFormatter.Reset();
-			ValidatorInstance = validator;
+			Options = options;
+			ValidatorInstance = validatorInstance;
 		}
+
 	}
 }
